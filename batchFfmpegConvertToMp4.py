@@ -16,7 +16,7 @@ def batchConvertToMp4(extensions=[]):
   mediaFiles = []
   for ext in extensions:
     mediaFiles += glob.glob('*.%s' %ext)
-  mediaFiles.sort(); seq = 0
+  mediaFiles.sort(); seq = 0; total = len(mediaFiles)
   for mediaFile in mediaFiles:
     fileExtLess = os.path.splitext(mediaFile)[0]
     mp4 = fileExtLess + '.mp4'
@@ -24,7 +24,9 @@ def batchConvertToMp4(extensions=[]):
       print mp4, 'exists. Jumping to next...'
       continue
     comm = commBase %{'mediaFile':mediaFile, 'mp4':mp4}  
-    seq += 1; print seq, comm
+    print '='*40
+    seq += 1; print seq, 'of', total, '::', comm
+    print '='*40
     os.system(comm)
 
 def fetchExtensionArguments():
