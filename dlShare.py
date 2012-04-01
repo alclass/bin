@@ -12,6 +12,7 @@ letterDict = { \
 'j':'Filejungle' , \
 'i':'Filesonic' , \
 'h':'Hotfile'   , \
+'l':'Ul' , \
 'm':'Megaupload'   , \
 'n':'Netload'   , \
 'o':'Oron'   , \
