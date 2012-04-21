@@ -1,0 +1,11 @@
+*.bak
+*.pyc
+*.py~
+*~
+*/*.pyc
+.project
+.pydevproject
+.settings
+*.sqlite
+*.desktop
+noip*

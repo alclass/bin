@@ -55,7 +55,7 @@ def doRenameAskingConfirmation(listOfFilesTupleForRename, doRename=False):
     seq += 1; renameLine = '%(seq)d of %(total)d Rename: "%(currentName)s" to "%(newName)s"' %{'seq':seq, 'total':total, 'currentName':currentName, 'newName':newName}
     print renameLine
     if doRename:
-      os.rename(eachFile, abapExtName)
+      os.rename(currentName, newName)
       print 'Renamed'
   if not doRename:
     ans = raw_input('Rename the above files ? (y/N) ')
