@@ -4,10 +4,12 @@ import os, sys, time
 from BeautifulSoup import BeautifulStoneSoup
 
 letterDict = { \
+'b':'Filepost' , \
 'c':'Filefactory' , \
 'd':'Depositfiles'   , \
 'e':'Easy-Share'   , \
 'f':'Fileserve' , \
+'g':'Fireget' , \
 'k':'Freakshare' , \
 'j':'Filejungle' , \
 'i':'Filesonic' , \
@@ -100,15 +102,12 @@ def processArg(arg):
     fileToUpdate.writelines(lines)
     fileToUpdate.close()
 
-
 def process():
   if len(sys.argv) < 2:
     explainArgumentAndExit()
-
   args = sys.argv[1:]
   for arg in args:
     processArg(arg)
-
 
 if __name__ == '__main__':
   process()
