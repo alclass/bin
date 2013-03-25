@@ -4,25 +4,29 @@ import os, sys, time
 from BeautifulSoup import BeautifulStoneSoup
 
 letterDict = { \
-'b':'Filepost' , \
-'c':'Filefactory' , \
 'd':'Depositfiles'   , \
-'e':'Easy-Share'   , \
-'f':'Fileserve' , \
-'g':'Fireget' , \
-'k':'Freakshare' , \
-'j':'Filejungle' , \
-'i':'Filesonic' , \
+'es':'Easy-Share'   , \
+'ex':'extabit'   , \
+'fg':'Fireget' , \
+'ff':'Filefactory' , \
+'fp':'Filepost' , \
+'fs':'Fileserve' , \
+'fs':'Freakshare' , \
+'fj':'Filejungle' , \
+'fi':'Filesonic' , \
 'h':'Hotfile'   , \
-'l':'Ul' , \
+'j':'Justfileupload'  , \
 'm':'Megaupload'   , \
 'n':'Netload'   , \
 'o':'Oron'   , \
 'r':'Rapidshare', \
+'rg':'Rapidgator', \
 's':'SharingMatrix', \
-'t':'Turboshare' , \
-'u':'Uploading' , \
-'p':'Uploaded' , \
+'tb':'Turbobit' , \
+'ts':'Turboshare' , \
+'ul':'Ul' , \
+'up':'Uploading' , \
+'ud':'Uploaded' , \
 'w':'Wupload' \
 }
 letters = letterDict.keys()
@@ -59,7 +63,7 @@ def processArg(arg):
     time.sleep(5) # wait 5 seconds
   print 'arg', arg,
   if arg and len(arg) > 0:
-    letter = arg[0].lower() # should be one digit (one letter), it doesn't care if user typed more
+    letter = arg.lower() # should be one digit (one letter), it doesn't care if user typed more
     if letter not in letters:
       explainArgumentAndExit()
 
