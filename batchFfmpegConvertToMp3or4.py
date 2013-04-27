@@ -8,7 +8,7 @@ import os
 import sys
 
 class LocalData:
-  commDict = {'audio' : 'ffmpeg -i "%(mediaFile)s" -acodec libmp3lame "%(mpx)s"', \
+  commDict = {'audio' : 'avconv -i "%(mediaFile)s" -acodec libmp3lame "%(mpx)s"', \
               'video' : 'ffmpeg -i "%(mediaFile)s" -vcodec libx264 "%(mpx)s"'}
   EXTENSIONS_DEFAULT = ['flv', 'm4v', 'mkv', 'mov', 'wmv']
  
