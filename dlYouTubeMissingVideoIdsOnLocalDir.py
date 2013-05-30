@@ -25,7 +25,7 @@ def download_individual_video(videoid, p_seq=1, total_to_go=1):
     line_msg = 'loop_seq = %d :: %s' %(loop_seq, comm); print_and_log(line_msg) 
     retVal = os.system(comm)
     line_msg = 'retVal = %d' %(retVal); print_and_log(line_msg)
-    if loop_seq > 4:
+    if loop_seq > 2: # ie, it tries 3 times!
       # give up
       return 
     if retVal <> 0:
@@ -40,6 +40,29 @@ def get_videoid(extlessname):
     pass
   return None
 
+import string
+has_lowercase_lambda = lambda c : c in string.lowercase
+has_UPPERCASE_lambda = lambda c : c in string.uppercase
+
+def return_videoid_if_good_or_None(videoid):
+  if videoid == None:
+    return None
+  elif len(videoid) != 11:
+    return None
+  elif videoid.find(' ') > -1:
+    return None
+  elif videoid.find('.') > -1:
+    return None
+  elif videoid.find('%') > -1:
+    return None
+  filter_result = map(has_lowercase_lambda, videoid)
+  if True not in filter_result:
+    return None
+  filter_result = map(has_UPPERCASE_lambda, videoid)
+  if True not in filter_result:
+    return None
+  return videoid
+
 def get_videoids_on_file(local_filename):
   videoids_on_file = []
   lines = open(local_filename).readlines()
@@ -52,11 +75,8 @@ def get_videoids_on_file(local_filename):
     try:
       extlessname = '.'.join(line.split('.')[:-1])
       videoid = get_videoid(extlessname)
+      videoid = return_videoid_if_good_or_None(videoid)
       if videoid == None:
-        continue
-      elif videoid.find('.') > -1:
-        continue
-      elif videoid.find('%') > -1:
         continue
       videoids_on_file.append(videoid)
     except IndexError:
@@ -88,7 +108,7 @@ class VideoIdsComparer(object):
       try:
         extlessname = os.path.splitext(mp4)[0]
         youtubeid = get_videoid(extlessname)
-        self.all_videoids.append()
+        self.all_videoids.append(youtubeid)
       except IndexError:
         continue
 
