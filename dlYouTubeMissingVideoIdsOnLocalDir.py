@@ -13,6 +13,9 @@ Explanation:
 '''
 import glob, logging, os, sys, time
 
+def print_and_log(line_msg):
+  print line_msg 
+  logging.info(line_msg)
 
 BASE_COMMAND_INDIVUAL_VIDEO = 'youtube-dl -w -f 18 http://www.youtube.com/watch?v=%(videoid)s'
 
@@ -126,7 +129,7 @@ class VideoIdsComparer(object):
     print 'Do you want to download the videos below ?'
     print self.missing_videoids
     print 'Total:', len(self.missing_videoids)
-    ans = raw_input('(Y/n ? ')
+    ans = raw_input('(Y/n) ? ')
     if ans in ['n', 'N']:
       return
     total_to_go = len(self.missing_videoids)
