@@ -4,6 +4,7 @@ import os, sys, time
 from BeautifulSoup import BeautifulStoneSoup
 
 letterDict = { \
+'b':'bitshare'   , \
 'd':'Depositfiles'   , \
 'es':'Easy-Share'   , \
 'ex':'extabit'   , \

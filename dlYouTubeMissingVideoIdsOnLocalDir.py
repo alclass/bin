@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 '''
+dlYouTubeMissingVideoIdsOnLocalDir.py
+
 Explanation: 
   This script reads a .txt file, which has a hardcoded name z-filenames.txt
   that have YouTube filenames as given by youtube-dl
@@ -43,7 +45,7 @@ def download_individual_video(videoid, p_seq=1, total_to_go=1):
       print 'Pausing for 2 minutes until next issuing of youtube-dl.'
       time.sleep(TWO_MIN_IN_SECS)
 
-def get_videoid(extlessname):
+def get_videoid_from_extless_filename(extlessname):
   try:
     videoid = extlessname[-11:]
     return videoid
@@ -51,6 +53,14 @@ def get_videoid(extlessname):
     pass
   return None
 
+def get_videoid_from_filename(filename):
+  try:
+    extlessname = '.'.join(filename.split('.')[:-1])
+    return get_videoid_from_extless_filename(extlessname)
+  except IndexError:
+    pass
+  return None
+  
 import string
 has_lowercase_lambda = lambda c : c in string.lowercase
 has_UPPERCASE_lambda = lambda c : c in string.uppercase
@@ -90,8 +100,7 @@ class VideoIdsOnFile(object):
         continue
       # strip extension and recompose filename without extension
       try:
-        extlessname = '.'.join(line.split('.')[:-1])
-        videoid = get_videoid(extlessname)
+        videoid = get_videoid_from_filename(line)
         videoid = return_videoid_if_good_or_None(videoid)
         if videoid == None:
           continue
@@ -120,7 +129,7 @@ def checkEveryFileHas11CharId():
 
 class VideoIdsComparer(object):
 
-  def __init__(self, local_filename):
+  def __init__(self, local_filename = 'z-filenames.txt'):
     self.local_filename = local_filename
     self.store_all_videoids_on_local_dir()
 
@@ -129,11 +138,15 @@ class VideoIdsComparer(object):
     mp4s = glob.glob('*.mp4')
     for mp4 in mp4s:
       try:
-        extlessname = os.path.splitext(mp4)[0]
-        youtubeid = get_videoid(extlessname)
+        #extlessname = os.path.splitext(mp4)[0]
+        #youtubeid = get_videoid(extlessname)
+        youtubeid = get_videoid_from_filename(mp4)
         self.all_videoids.append(youtubeid)
       except IndexError:
         continue
+
+  def get_all_mp4_videoids_on_local_dir(self):
+    return self.all_videoids
 
   def compareLocalIdsWithFileDB(self):
     self.missing_videoids = []; n_missing = 0
