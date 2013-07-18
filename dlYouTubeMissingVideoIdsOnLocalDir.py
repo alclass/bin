@@ -5,7 +5,7 @@ dlYouTubeMissingVideoIdsOnLocalDir.py
 
 Explanation: 
   This script reads a .txt file, which has a hardcoded name z-filenames.txt
-  that have YouTube filenames as given by youtube-dl
+  that has YouTube filenames as given by youtube-dl
   (this filename is the video title, a '-' (dash), its videoid, then the dot extension)
   It can also read filenames that have starts with '-' (dash) before the videoid, ie,
   filenames that do not have the title part.

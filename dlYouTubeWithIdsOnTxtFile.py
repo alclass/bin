@@ -2,15 +2,23 @@
 # -*- coding: utf-8 -*-
 import os, re, sys, time
 '''
-Explanation:  
-  This script reads a list of YouTube Video Ids from a text file (default name is 'youtube-ids.txt')
-  This file must have the 11-character video id starting each line. 
-  (A "#" at the beginning of a line ignores that line.)
+
+This script downloads videoid inside a text file that are (yet) not present on the local folder.
+
+The 3 steps below further explain the functionality of this script:
   
-  Before starting download, a confirmation yes/no is asked in the shell-terminal. 
+  1) This script reads a list of YouTube Video Ids from a text file (default name is 'youtube-ids.txt')
+       This file must have the 11-character video id starting each line. 
+       (A "#" at the beginning of a line ignores that line.)
+  
+  2) The video ids collected from 'youtube-ids.txt' (or a non-default file) are compared with the
+       mp4s that have videoids ending the filename before the extension. If this videoid is already present,
+       it is discarded.  If not present, it queues up to be downloaded.
+  
+  3) A confirmation yes/no for the download of the queued-up files, is asked in the shell-terminal,
+     ie, download will only begin if the user doesn't say 'no' (n or N).
 
 '''
-
 
 from dlYouTubeMissingVideoIdsOnLocalDir import VideoIdsComparer # a class
 
@@ -96,27 +104,25 @@ class VideoidsGrabberAndDownloader(object):
     self.n_downloaded = 0
     for i, vid in enumerate(self.videoids_to_download):
       n_seq = i + 1
-      download_done = False; n_tries = 1
-      while not download_done or n_tries < self.MAX_N_TRIES:
-        download_done = self.issue_download(n_seq, n_tries, vid)
-        n_tries += 1
+      self.issue_download(n_seq, vid)
         
-  def issue_download(self, n_seq, n_tries, vid):
+  def issue_download(self, n_seq, vid):
     '''
     Proceed download of passed-on video id
     '''
-    print  n_seq, 'n.of dl. so far', self.n_downloaded, 'of', len(self.videoids_to_download), 'video', vid, 'n_tries', n_tries
-    comm = 'youtube-dl -f 18 "http://www.youtube.com/?v=%s"' %vid
-    print comm
-    ret_val = os.system(comm)
-    if ret_val == 0:
-      download_done = True
-      self.n_downloaded += 1
-    else:
-      download_done = False
+    n_tries = 1
+    while n_tries <= self.MAX_N_TRIES:
+      print  n_seq, 'n.of dl. so far', self.n_downloaded, 'of', len(self.videoids_to_download), 'video', vid, 'n_tries', n_tries
+      comm = 'youtube-dl -f 18 "http://www.youtube.com/?v=%s"' %vid
+      print comm
+      ret_val = os.system(comm)
+      if ret_val == 0:
+        self.n_downloaded += 1
+        return
       print 'Problem with the download: waiting 3 min.'
       time.sleep(3*60)
-    return download_done
+      n_tries += 1
+    print 'After', self.MAX_N_TRIES, 'tries, given up downloading', vid
 
 
 def process():
