@@ -1,11 +1,13 @@
-*.bak
-*.pyc
-*.py~
 *~
+*/*~
+*.bak
+*/*.bak
+*.pyc
 */*.pyc
 .project
 .pydevproject
 .settings
 *.sqlite
+*/*.sqlite
 *.desktop
 noip*

@@ -30,9 +30,15 @@ class VideoidsGrabberAndDownloader(object):
   DEFAULT_TXT_FILE = 'youtube-ids.txt'
   MAX_N_TRIES = 3
   
-  def __init__(self):
-    self.youtubeids_filename = self.DEFAULT_TXT_FILE
+  def __init__(self, youtubeids_filename=None):
+    self.set_youtubeids_filename(youtubeids_filename)
     self.process()
+
+  def set_youtubeids_filename(self, youtubeids_filename=None):
+    if youtubeids_filename == None or not os.path.isfile(youtubeids_filename):
+      self.youtubeids_filename = self.DEFAULT_TXT_FILE
+      return
+    self.youtubeids_filename = youtubeids_filename
     
   def process(self):
     self.read_ids_from_txt_file()
@@ -112,7 +118,7 @@ class VideoidsGrabberAndDownloader(object):
     '''
     n_tries = 1
     while n_tries <= self.MAX_N_TRIES:
-      print  n_seq, 'n.of dl. so far', self.n_downloaded, 'of', len(self.videoids_to_download), 'video', vid, 'n_tries', n_tries
+      print  n_seq, 'n.of dl. so far', self.n_downloaded, 'of', len(self.videoids_to_download), 'video', vid, 'n_tries', n_tries, '[%s]' %time.ctime()
       comm = 'youtube-dl -f 18 "http://www.youtube.com/?v=%s"' %vid
       print comm
       ret_val = os.system(comm)
@@ -126,7 +132,12 @@ class VideoidsGrabberAndDownloader(object):
 
 
 def process():
-  VideoidsGrabberAndDownloader()  
+  youtubeids_filename = None
+  try:
+    youtubeids_filename = sys.argv[1]
+  except IndexError:
+    pass
+  VideoidsGrabberAndDownloader(youtubeids_filename)  
 
 if __name__ == '__main__':
   process()
