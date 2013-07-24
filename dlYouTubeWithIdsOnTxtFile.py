@@ -80,7 +80,8 @@ class VideoidsGrabberAndDownloader(object):
           continue
         if len(vid) > 11:
           vid = vid[:11]
-        self.videoids_to_download.append(vid)
+        if vid not in self.videoids_to_download: 
+          self.videoids_to_download.append(vid)
       except IndexError: # if line[0] above raises it in case line is empty
         pass
 
