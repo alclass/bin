@@ -48,7 +48,9 @@ def download_individual_video(videoid, p_seq=1, total_to_go=1):
 def get_videoid_from_extless_filename(extlessname):
   try:
     videoid = extlessname[-11:]
-    return videoid
+    videoid = return_videoid_if_good_or_None(videoid)
+    if videoid != None:
+      return videoid
   except IndexError:
     pass
   return None

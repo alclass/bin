@@ -31,7 +31,6 @@ class OSWalkerForUTubeVideoIds(object):
     else:
       self.local_root_abs_path = abs_path
     
-        
   def find_if_any_videoids_among_files(self):
     for filename in self.filenames:
       videoid = get_videoid_from_filename(filename)
