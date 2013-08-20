@@ -19,6 +19,27 @@ Explanation:
     + it must not have the following characters: ' ' (blank), '%' nor '.';
     + it must have at least one lowercase letter and one UPPERCASE letter.
 
+
+
+***
+Though the following is not parameterized, here follows an example with --list-formats:
+
+youtube-dl --list-formats http://www.youtube.com/watch?v=pNDtN4XM8KA
+[youtube] Setting language
+[youtube] pNDtN4XM8KA: Downloading video webpage
+[youtube] pNDtN4XM8KA: Downloading video info webpage
+[youtube] pNDtN4XM8KA: Extracting video information
+Available formats:
+37  :  mp4  [1080x1920]
+45  :  webm  [720x1280]
+22  :  mp4  [720x1280]
+44  :  webm  [480x854]
+35  :  flv  [480x854]
+43  :  webm  [360x640]
+34  :  flv  [360x640]
+18  :  mp4  [360x640]
+5  :  flv  [240x400]
+
 '''
 import glob, logging, os, sys, time
 

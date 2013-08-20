@@ -14,6 +14,9 @@ Explanation:
   from id-only filenames to title-and-id filenames.
 '''
 
+class YoutubeRenameDataFileDoesNotExist(IOError):
+  pass
+
 class Renamer(object):
   '''
   This class models the processing of renaming YouTube videofiles 
@@ -22,10 +25,17 @@ class Renamer(object):
   
   DEFAULT_TXT_FILE_WITH_NEW_FILENAMES = 'youtube-map-ids-to-titles.txt'
   
-  def __init__(self):
-    self.youtube_target_filenames_with_title_plus_id = self.DEFAULT_TXT_FILE_WITH_NEW_FILENAMES
+  def __init__(self, youtube_filenames_as_title_plus_videoid_file_abspath=None):
+    self.init_youtube_filenames_as_title_plus_videoid_file_abspath(youtube_filenames_as_title_plus_videoid_file_abspath)
     self.process()
     
+  def init_youtube_filenames_as_title_plus_videoid_file_abspath(self, youtube_filenames_as_title_plus_videoid_file_abspath):
+    self.youtube_filenames_as_title_plus_videoid_file_abspath = self.DEFAULT_TXT_FILE_WITH_NEW_FILENAMES
+    if youtube_filenames_as_title_plus_videoid_file_abspath != None:
+      self.youtube_filenames_as_title_plus_videoid_file_abspath = youtube_filenames_as_title_plus_videoid_file_abspath
+    if not os.path.isfile(self.youtube_filenames_as_title_plus_videoid_file_abspath):
+      raise YoutubeRenameDataFileDoesNotExist, 'YoutubeRenameDataFileDoesNotExist (file: [%s])' %self.youtube_filenames_as_title_plus_videoid_file_abspath 
+
   def process(self):
     self.init_map_current_ids_to_filenames()
     self.init_to_be_map_of_ids_with_newfilenames()
@@ -37,8 +47,14 @@ class Renamer(object):
     '''
       Initialize dict self.map_current_ids_to_filenames
     '''
-    self.map_current_ids_to_filenames = {} 
-    files = glob.glob('*.webm')
+    self.map_current_ids_to_filenames = {}
+    target_path, _ = os.path.split(self.youtube_filenames_as_title_plus_videoid_file_abspath)
+    if os.path.isdir(target_path):
+      os.chdir(target_path) 
+    files = glob.glob('*.flv')
+    files += glob.glob('*.mov')
+    files += glob.glob('*.mp4')
+    files += glob.glob('*.webm')
     for filename in files:
       video_id, extension = os.path.splitext(filename)
       if len(video_id) != 11: # extension.lower() != '.webm' or
@@ -52,14 +68,14 @@ class Renamer(object):
       Initialize dict self.map_ids_to_newfilenames
     '''
     self.map_ids_to_newfilenames = {} 
-    lines=open(self.youtube_target_filenames_with_title_plus_id).readlines()
+    lines=open(self.youtube_filenames_as_title_plus_videoid_file_abspath).readlines()
     for filename in lines:
       try:
         if filename.endswith('\n'):
           filename = filename.rstrip('\n')
           title_and_id, extension = os.path.splitext(filename)
-          if extension != '.mp4':
-            continue
+          #if extension != '.mp4':
+            #continue
           title_and_dash = title_and_id[:-11]
           if not title_and_dash.endswith('-'):
             continue
@@ -116,8 +132,19 @@ class Renamer(object):
       print '[done]'
       self.n_renamed += 1
 
+def print_usage_and_exit():
+  print '''Usage:
+  uTubeRenameIdsFilesAddingTheirTitles.py [renamefile <rename local file> | <rename file abspath>]
+  '''
+  sys.exit(0)
+  
 def process():
-  Renamer()  
+  if 'help' in sys.argv:
+    print_usage_and_exit()
+  renamefile = None
+  if 'renamefile' in sys.argv:
+    renamefile = sys.argv[2]
+  Renamer(renamefile)
 
 if __name__ == '__main__':
   process()

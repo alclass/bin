@@ -4,6 +4,10 @@
 */*.bak
 *.pyc
 */*.pyc
+*.ex
+*/*.ex
+local_settings.py
+*/local_settings.py
 .project
 .pydevproject
 .settings
@@ -11,3 +15,4 @@
 */*.sqlite
 *.desktop
 noip*
+bin_non_gitable/

@@ -1,0 +1,133 @@
+#!/usr/bin/python
+
+import sys, getopt, os, traceback
+import tempfile
+from pyscript.version import version as versionNum
+
+def usage():
+    print """Usage:
+    pyscript [options] file.py
+
+    options:
+    [-h/--help]                Print usage information and exit
+    [-V/--version]             Print version information and exit
+    [-o/--output=outputFile]   Specify an alternative output file name
+    [-l/--logfile=logFile]     Specify an alternative log file name
+    """
+
+def version():
+    print "This is pyscript version %s" % (versionNum,)
+    print "For more information see http://pyscript.sourceforge.net\n"
+
+#---------------------------------------------------------------------
+# Handle options
+#---------------------------------------------------------------------
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "hVo:l:d", 
+	    ["help", "version", "output=", "logfile="])
+except getopt.GetoptError:
+    # print help information and exit:
+    usage()
+    sys.exit(2)
+
+logFile = "pyscript.log"
+
+DEBUG=False
+globals={}
+for o, a in opts:
+    if o in ("-h", "--help"):
+        usage()
+        sys.exit()
+    if o in ("-V", "--version"):
+	version()
+	sys.exit()
+    if o in ("-o", "--output"):
+        globals['output']=a
+    elif o in ("-l", "--logfile"):
+        logFile=a
+    elif o in ("-d",):
+        DEBUG=True
+        
+if len(args) != 1:
+    usage()
+    sys.exit()
+
+# print some pretty info
+version()
+
+#---------------------------------------------------------------------
+# Set up log file
+#---------------------------------------------------------------------
+
+# redirect stdout and stderr to file
+# keep a copy
+save_err = sys.stderr
+
+# open the log file
+#tempfile.template="pyscript-"
+#logFile = tempfile.mktemp(".log")
+
+if logFile=="-":
+    log=sys.stdout
+else:
+    log = open(logFile,"w")
+    print "Log file is",logFile
+
+sys.stderr = log
+
+#---------------------------------------------------------------------
+# look for ~/.pyscript
+#---------------------------------------------------------------------
+
+# now see about importing the defaults from .pyscript/defaults.py
+HOME = os.path.expandvars("$HOME")
+
+# if $HOME/.pyscript directory exists, append this to the python path
+# this is so that user defined libs can be imported
+if os.path.isdir(HOME+'/.pyscript'):
+    sys.path.append(HOME+'/.pyscript')
+
+if os.path.isfile(HOME+'/.pyscript/defaults.py'):
+    # try $HOME/.pyscript/defaults.py
+    execfile(HOME+'/.pyscript/defaults.py',globals)
+else:
+    print "No user defaults file found."
+
+print "Executing script..."
+
+#---------------------------------------------------------------------
+# now run the script
+#---------------------------------------------------------------------
+try:
+    execfile(args[0],globals)
+except:
+    divider="-"*60+'\n'
+
+    sys.stderr.write("Exception in user code:\n")
+    sys.stderr.write(divider)
+    traceback.print_exc(file=sys.stderr)
+    sys.stderr.write(divider)
+
+    sys.stdout.write("Exception in user code:\n")
+    sys.stdout.write(divider)
+    traceback.print_exc(file=sys.stdout)
+    sys.stdout.write(divider)
+    print "Further clues may be found in the log file:",logFile
+else:
+    # clean up a bit
+    sys.stderr = save_err
+    if logFile!="-":
+        log.close()
+        if not DEBUG:
+            print "Removing log file"
+            os.remove(logFile)
+            print "Removing temp files"
+	    tempfiles = ("temp.aux", "temp.dvi", "temp.log", "temp.ps",
+			"temp.tex", "temp1.aux", "temp1.dvi", "temp1.eps",
+			"temp1.log", "temp1.tex")
+	    for tmpfile in tempfiles:
+		if os.path.exists(tmpfile):
+		    os.remove(tmpfile)
+    print "Done!"
+    
