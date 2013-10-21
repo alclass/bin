@@ -42,7 +42,7 @@ class VideoidsGrabberAndDownloader(object):
     
   def process(self):
     self.read_ids_from_txt_file()
-    self.compare_ids_with_mp4s_already_on_localdir()
+    self.compare_videoids_with_filevideoids_already_on_localdir()
     self.please_confirm_download()
     self.download_videos_by_their_ids()
     
@@ -85,12 +85,12 @@ class VideoidsGrabberAndDownloader(object):
       except IndexError: # if line[0] above raises it in case line is empty
         pass
 
-  def compare_ids_with_mp4s_already_on_localdir(self):
+  def compare_videoids_with_filevideoids_already_on_localdir(self):
     video_comparer = VideoIdsComparer()
-    mp4_ids_on_localdir = video_comparer.get_all_mp4_videoids_on_local_dir()
+    all_filevideoids_on_localdir = video_comparer.get_all_filevideoids_on_local_dir()
     new_video_ids = []
     for vid in self.videoids_to_download:
-      if vid not in mp4_ids_on_localdir:
+      if vid not in all_filevideoids_on_localdir:
         new_video_ids.append(vid)
     self.videoids_to_download = new_video_ids
 
@@ -98,11 +98,14 @@ class VideoidsGrabberAndDownloader(object):
     '''
     To ask the user to confirm or not the download of all taken ids
     '''
-    print self.videoids_to_download
-    print 'vids_total', len(self.videoids_to_download)
-    ans = raw_input(' Y*/n ')
-    if ans in ['n', 'N']:
-      sys.exit(0)
+    if len(self.videoids_to_download) > 0:
+      print 'Videoids to download:'
+      print self.videoids_to_download
+    print 'Total videoids to download:', len(self.videoids_to_download)
+    if len(self.videoids_to_download) > 0:
+      ans = raw_input(' Y*/n ')
+      if ans in ['n', 'N']:
+        sys.exit(0)
   
   def download_videos_by_their_ids(self):
     '''

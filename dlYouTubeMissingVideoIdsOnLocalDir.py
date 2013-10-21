@@ -88,23 +88,25 @@ import string
 has_lowercase_lambda = lambda c : c in string.lowercase
 has_UPPERCASE_lambda = lambda c : c in string.uppercase
 
+FORBIDDEN_CHARS_IN_YOUTUBEVIDEOID = '!@#$%&*()+=Çç/:;.,[]{}|\\ \'"'
+youtubevideoid_having_some_forbidden_char_lambda = lambda s : s in FORBIDDEN_CHARS_IN_YOUTUBEVIDEOID   
 def return_videoid_if_good_or_None(videoid):
   if videoid == None:
     return None
   elif len(videoid) != 11:
     return None
-  elif videoid.find(' ') > -1:
+  videoidlist = list(videoid)
+  boolean_result_list = map(youtubevideoid_having_some_forbidden_char_lambda, videoidlist)
+  if True in boolean_result_list:
     return None
-  elif videoid.find('.') > -1:
-    return None
-  elif videoid.find('%') > -1:
-    return None
-  boolean_list_result = map(has_lowercase_lambda, videoid)
-  if True not in boolean_list_result:
-    return None
-  boolean_list_result = map(has_UPPERCASE_lambda, videoid)
-  if True not in boolean_list_result:
-    return None
+  #=============================================================================
+  # boolean_result_list = map(has_lowercase_lambda, videoid)
+  # if True not in boolean_result_list:
+  #   return None
+  # boolean_result_list = map(has_UPPERCASE_lambda, videoid)
+  # if True not in boolean_result_list:
+  #   return None
+  #=============================================================================
   return videoid
 
 class VideoIdsOnFile(object):
@@ -154,28 +156,42 @@ class VideoIdsComparer(object):
 
   def __init__(self, local_filename = 'z-filenames.txt'):
     self.local_filename = local_filename
-    self.store_all_videoids_on_local_dir()
+    self.all_filevideoids = None
+    self.store_all_filevideoids_on_local_dir()
 
-  def store_all_videoids_on_local_dir(self):
-    self.all_videoids = []
-    mp4s = glob.glob('*.mp4')
-    for mp4 in mp4s:
+  def store_all_filevideoids_on_local_dir(self):
+    self.all_filevideoids = []
+    files = os.listdir('.')
+    for filename in files:
+      if not os.path.isfile(filename):
+        continue
       try:
-        #extlessname = os.path.splitext(mp4)[0]
-        #youtubeid = get_videoid(extlessname)
-        youtubeid = get_videoid_from_filename(mp4)
-        self.all_videoids.append(youtubeid)
+        extlessname = filename
+        if filename.find('.') > -1:
+          extlessname = os.path.splitext(filename)[0]
+        youtubeid = get_videoid_from_extless_filename(extlessname)
+        if youtubeid != None:
+          self.all_filevideoids.append(youtubeid)
       except IndexError:
         continue
 
   def get_all_mp4_videoids_on_local_dir(self):
-    return self.all_videoids
+    mp4s = []
+    for filevideoid in self.all_filevideoids:
+      if filevideoid.endswith('.mp4'):
+        mp4s.append(filevideoid)
+    return mp4s
+
+  def get_all_filevideoids_on_local_dir(self):
+    if self.all_filevideoids == None:
+      self.store_all_filevideoids_on_local_dir()
+    return self.all_filevideoids
 
   def compareLocalIdsWithFileDB(self):
     self.missing_videoids = []; n_missing = 0
     videoidsObj = VideoIdsOnFile(self.local_filename)
     for videoid in videoidsObj.get_videoids_on_file():
-      if videoid not in self.all_videoids:
+      if videoid not in self.all_filevideoids:
         n_missing += 1
         # print n_missing, 'VideoId', videoid, 'in file not on local dir.'
         self.missing_videoids.append(videoid)
