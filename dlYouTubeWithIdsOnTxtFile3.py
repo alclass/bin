@@ -1,0 +1,19 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+'''
+
+'''
+import sys
+sys.path.insert(0, '/home/dados/Sw3/SwDv/CompLang SwDv/PythonSwDv/PythonScrapingEtcSwDv/uTubeOurApps/')
+from shellclients.dlYouTubeWithIdsOnTxtFile import VideoidsGrabberAndDownloader 
+
+def process():
+  youtubeids_filename = None
+  try:
+    youtubeids_filename = sys.argv[1]
+  except IndexError:
+    pass
+  VideoidsGrabberAndDownloader(youtubeids_filename)  
+
+if __name__ == '__main__':
+  process()

@@ -8,6 +8,7 @@
 */*.ex
 local_settings.py
 */local_settings.py
+.directory
 .project
 .pydevproject
 .settings
