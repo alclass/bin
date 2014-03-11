@@ -6,7 +6,7 @@
 */*.pyc
 *.ex
 */*.ex
-local_settings.py
+bin_local_settings.py
 */local_settings.py
 .directory
 .project
