@@ -4,7 +4,8 @@
 
 '''
 import sys
-sys.path.insert(0, '/home/dados/Sw3/SwDv/CompLang SwDv/PythonSwDv/PythonScrapingEtcSwDv/uTubeOurApps/')
+import bin_local_settings as bls # local bin settings
+sys.path.insert(0, bls.UTUBEAPP_PATH)
 from shellclients.dlYouTubeWithIdsOnTxtFile import VideoidsGrabberAndDownloader 
 
 def process():
