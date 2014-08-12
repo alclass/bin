@@ -17,3 +17,6 @@ bin_local_settings.py
 *.desktop
 noip*
 bin_non_gitable/
+oscillator
+pyidle
+source-ifort-path
