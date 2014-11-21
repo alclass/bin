@@ -7,12 +7,11 @@ import glob, os, string, sys #, shutil, sys
 
 class Renamer(object):
   '''
+
   '''
   def __init__(self, beginningStrToWipeOut):
     """
-    :param addtext:
-    :param extension:
-    :raise ValueError:
+
     """
     if beginningStrToWipeOut == None:
       raise ValueError, "Renamer must receive an 'beginningStrToWipeOut' input parameter. It's been passed as None."
