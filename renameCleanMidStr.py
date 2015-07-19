@@ -32,7 +32,7 @@ class Args:
       elif arg.startswith('-s='):
         self.size = int( arg[len('-s=') : ] )
 
-  def check_if_pos_and_size_were_set(self):
+  def check_if_pos_and_size_were_set(self):a
     if self.pos == None or self.size == None:
       print_explanation_and_exit()
 
