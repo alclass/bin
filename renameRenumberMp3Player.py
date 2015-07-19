@@ -3,6 +3,7 @@
 '''
   This script aims to renumber files in a directory.
   The renumbering occurs for files having 2-digit numbers from 00 to 99, but it, when renaming, it will start at 01
+  There are TWO species of renaming here. One with truncation, the other with preprending.
 
   In practice, suppose there are these files:
 
@@ -15,6 +16,9 @@
 01 filename X.ext
 02 filename Y.ext
 03 filename Z.ext
+
+ The '-a' CLI parameter only prepends numbers to the filenames.
+ Usage is: comm -a [<optional start number>]
 
   IMPORTANT: this script does not take into account file numbers above 99, and 00 is left as is
 '''
@@ -70,7 +74,43 @@ def collectFilDict():
 	filDict[seq] = (1,fil)
   return filDict
 
+def doPrependNumbers(n_rename_start, doRename=False):
+  files = os.listdir('.')
+  if len(files) > 99:
+    print 'There are more than 99 files. Giving up.'
+    return
+  files.sort(); nToRename = n_rename_start
+  for filename in files:
+    preprend_str = '%02d ' %nToRename
+    newfilename = preprend_str + filename
+    if doRename:
+      print nToRename, 'renaming [%s] TO [%s]' %(filename, newfilename)
+      os.rename(filename, newfilename)
+    else:
+      print nToRename, 'To rename [%s] TO [%s]' %(filename, newfilename)
+    nToRename += 1
+  if not doRename:
+    print 'ATTENTION:'
+    print 'Do you really want to rename those', nToRename, 'files above ? '
+    ans = raw_input(' y/N ? ')
+    if ans in ['y','Y']:
+      doPrependNumbers(n_rename_start, doRename=True)
+
+
+
 def main():
+  try:
+    if sys.argv[1] == '-a':
+      n_rename_start = 1
+      if len(sys.argv) > 2:
+        try:
+          n_rename_start = int(sys.argv[2])
+        except ValueError:
+          pass
+      doPrependNumbers(n_rename_start)
+      return
+  except IndexError:
+    pass
   filDict = collectFilDict()
   nToRename, nOfRenamed = processRename(filDict, False)
   if nToRename == 0:
