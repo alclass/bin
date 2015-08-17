@@ -3,7 +3,7 @@
 import os, sys, time
 
 DEFAULT_PAUSE_BETWEEN_DOWNLOADS = 5 # seconds
-commbase = 'wget -c "http://www.youtube.com/results?search_query=%(artist_1st_name)s+%(artist_2nd_name)s&page=%(seq)d" -O "%(artist_1st_name)s %(artist_2nd_name)s - YouTube %(seq)d.html"'
+commbase = 'wget -c --no-check-certificate "https://www.youtube.com/results?search_query=%(artist_1st_name)s+%(artist_2nd_name)s&page=%(seq)d" -O "%(artist_1st_name)s %(artist_2nd_name)s - YouTube %(seq)d.html"'
 
 def issueWgetToFetchPages(artist_tuple, pause_in_between_downloads = None):
   artist_1st_name = artist_tuple[0]  

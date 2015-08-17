@@ -25,7 +25,7 @@ import sys
 # import  bin_local_settings as bls
 # sys.path.insert(0, bls.UTUBEAPP_PATH)
 
-from shellclients import extractVideoidsFromATextFileMod as extract_script
+#from shellclients import extractVideoidsFromATextFileMod as extract_script
 
 def get_vids_from_file(videoids_filename):
   videoids = []
