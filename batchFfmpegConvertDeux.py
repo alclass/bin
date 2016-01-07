@@ -48,6 +48,24 @@ def batchConvertToEitherMp3or4(extensions=[], isAudio=False):
     mediaObj = Media(mediaFileFrom, total, isAudio)
     mediaObj.issueCommand()
 
+def batchConvertToMp3(files_to_convert):
+  '''
+  :param files_to_convert: media video filenames that will be mp3-converted
+  :return:void
+
+   This method/function was programmed to suit an external call,
+   from another scripting, receiving a list (files_to_convert) of
+   media video files to be mp3-converted.
+
+   The first "client" called is batchWalkFfmpegConvertDeux.py
+   Added on 2015-01-06 Luiz Lewis
+  '''
+  total = len(files_to_convert)
+  for mediaFileFrom in files_to_convert:
+    isAudio = True
+    mediaObj = Media(mediaFileFrom, total, isAudio)
+    mediaObj.issueCommand()
+
 def fetchExtensionArguments():
   isAudio = False
   extensions = []
