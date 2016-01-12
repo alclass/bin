@@ -16,6 +16,7 @@ bin_local_settings.py
 */*.sqlite
 *.desktop
 noip*
+.idea/
 bin_non_gitable/
 oscillator
 pyidle

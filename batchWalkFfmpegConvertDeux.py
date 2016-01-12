@@ -4,7 +4,7 @@
 batchWalkFfmpegConvertDeux.py
 Explanation:
   This script is a dir-walker that grabs media video files
-  (defaulting to mp4; another extension should be given as a cli-parameter),
+  (defaulting to mp4; another extension should gitbe given as a cli-parameter),
   then calls batchFfmpegConvertDeux.py to convert them to mp3.
 
   In a sense, this script is a wrapper around batchFfmpegConvertDeux.py,
