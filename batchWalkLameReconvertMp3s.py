@@ -1,26 +1,32 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 '''
-batchWalkFfmpegConvertDeux.py
+batchWalkLameReconvertMp3s.py
 Explanation:
-  This script is a dir-walker that grabs media video files
-  (defaulting to mp4; another extension should gitbe given as a cli-parameter),
-  then calls batchFfmpegConvertDeux.py to convert them to mp3.
+  This script is a dir-walker that runs lame in order to reconvert mp3s
+  It has a parameter that allows for checking whether or not dirname has
+    some text mark (a string piece) on it. If it has, mp3s in folder will
+    be processed. If not, those mp3s, if any, won't be reconverted.
 
-  In a sense, this script is a wrapper around batchFfmpegConvertDeux.py,
-  giving it a disk tree wide capability to mp3-convert many files automatically.
+  To do:
+    A check of bitrate and sample-frequency is in order to be implemented in the future.
+    This is so that if the target file is already the source file, no processing
+      is necessary.
 
-  Written on 2015-01-06 Luiz Lewis
+  Written on 2015-01-13 Luiz Lewis
 '''
 import os
 import sys
 import batchFfmpegConvertDeux as batchConverter
 
 def process_folder(current_path, files_to_convert):
-  print 'where am I:', os.path.curdir
   print 'current_path:', current_path
-  isAudio=True
-  batchConverter.batchConvertToMp3(files_to_convert)
+  for filename in files_to_convert:
+    comm = 'lame --mp3input -b 32 --resample 22.50 "%(filename)s" "%(filename)s-32k.mp3"' %{'filename':filename}
+    os.system(comm)
+    print 'Rename', filename
+    comm = 'mv "%(filename)s-32k.mp3" "%(filename)s"' %{'filename':filename}
+    os.system(comm)
 
 PROCESS_DIRNAME_WITH_THIS_STRPIECE = ' _i ' # this is a string-marker that every SabDir course has
 def go_ahead_on_dirname_allowance_check(dirpath):
@@ -41,19 +47,16 @@ def check_param_process_dirname_based_on_determined_strpiece():
       return
 
 def main():
-  check_param_process_dirname_based_on_determined_strpiece()
-  target_ext = 'mp4'
-  extensions = []
-  if len(sys.argv) > 1:
-    target_ext = sys.argv[1]
-    extensions = [target_ext]
+  # check_param_process_dirname_based_on_determined_strpiece()
+  process_dirname_based_on_determined_strpiece = True
   basepath = os.path.abspath('.')
   walk_counter = 0
   for dirpath, dirnames, filenames in os.walk('.'):
     complement_path = dirpath
-    if process_dirname_based_on_determined_strpiece and if not go_ahead_on_dirname_allowance_check(dirpath):
-      print 'Not converting dir', dirpath
-      continue
+    if process_dirname_based_on_determined_strpiece:
+      if not go_ahead_on_dirname_allowance_check(dirpath):
+        print 'Not converting dir', dirpath
+        continue
     if complement_path.startswith('./'):
       complement_path = complement_path[2:]
     current_path = os.path.join(basepath, complement_path)
@@ -61,7 +64,7 @@ def main():
     print walk_counter, 'current path:', current_path
     files_to_convert = []
     for fichier in filenames:
-      if fichier.endswith('.'+target_ext):
+      if fichier.endswith('.mp3'):
         files_to_convert.append(fichier)
     if len(files_to_convert) > 0:
       print 'FOUND @', complement_path
