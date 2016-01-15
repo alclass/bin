@@ -51,7 +51,7 @@ def main():
   walk_counter = 0
   for dirpath, dirnames, filenames in os.walk('.'):
     complement_path = dirpath
-    if process_dirname_based_on_determined_strpiece and if not go_ahead_on_dirname_allowance_check(dirpath):
+    if process_dirname_based_on_determined_strpiece and not go_ahead_on_dirname_allowance_check(dirpath):
       print 'Not converting dir', dirpath
       continue
     if complement_path.startswith('./'):
