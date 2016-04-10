@@ -9,6 +9,8 @@ http://audio.wordproject.com/bibles/app/audio/10_40.zip
 41 is Mark
 http://audio.wordproject.com/bibles/app/audio/7_41.zip
 
+http://audio3.wordproject.com/bibles/app/audio/34_40.zip
+
 Exceptions:
 For Greek and Latin, examples:
   http://www.wordproaudio.com/audio_lists/gk/40_mat.zip etc
@@ -18,7 +20,7 @@ For Greek and Latin, examples:
 '''
 import glob, os, shutil, sys, time
 
-url_base = 'http://audio.wordproject.com/bibles/app/audio/%(language_number)s_%(bible_book_number)d.zip'
+url_base = 'http://audio3.wordproject.com/bibles/app/audio/%(language_number)s_%(bible_book_number)d.zip'
 
 lang_dict = {
   1:'English',
@@ -30,6 +32,7 @@ lang_dict = {
   9:'German',
   10:'Italian',
   16:'Arabic',
+  34:'Romanian',
   39:'Latin (Vulgate)',
   40:'Greek',
 }
