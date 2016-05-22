@@ -5,6 +5,7 @@ bin_local_settings.py
 .pydevproject
 .settings
 .idea/
+.idea/*
 bin_non_gitable/
 oscillator
 pyidle
