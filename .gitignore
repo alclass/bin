@@ -16,4 +16,5 @@ noip*
 *.pyc
 *.sqlite
 .idea/
+.idea/*.xml
 bin_non_gitable/
