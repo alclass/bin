@@ -1,21 +1,37 @@
 #!/usr/bin/env python
+'''
+This script belongs to the 'rename' prefix Python group of scripts located in the user's bin folder (or, in fact, anywhere).
+It does a particular kind of file renaming, which is the following:
+ Given a filename, the script will attempt to strip a [p, s] chunk of it,
+ where p is string initial position and s is the number of chars to strip off.
+Example:
+
+ '01 - blah - The Title.mp4'
+
+If we want the new filename to be:
+
+'01 The Title.mp4'
+
+The chunk '- blah - ' needs to be strip off the original filename.
+
+In this case, -p should be 4 (the initial 0-based index position) and -s should be 9 which is the length/size of '- blah - '
+Of course, -ext should be 'mp4' (but the script is able to have None in this parameter and cover the whole directory listing)
+'''
+
 import os, sys
 # import glob, string, shutil
 # import getopt
 
-def print_explanation_and_exit():
-  print '''Arguments to the script:
-  ===========================================
-    -p=<integer> It is the string index to begin the char-cleaning
-    -s=<integer> It is the number of chars (the size) to clean (withdraw from filename)
-    -e=<extension> It is the file's extension
-  ===========================================
-'''
-  sys.exit(0)
 
-# args = ['-p=', '-s=', '-e']
-class Args:
+class Args(object):
   '''
+  This is a CLI arguments fetcher class.
+  TO-DO : substitute this class with a more standard Python class or API
+
+  The arguments to be fetched are:
+    # args = ['-p=', '-s=', '-e']
+
+  The explanation of each one of the arguments with found in the print_explanation_and_exit() method below
 
   '''
   def __init__(self):
@@ -24,6 +40,16 @@ class Args:
     self.file_ext = None
     self.process_cli_args()
     self.check_if_pos_and_size_were_set()
+
+  def print_explanation_and_exit(self):
+    print '''Arguments to the script:
+    ===========================================
+      -p=<integer> required :: it is the string index to begin the char-cleaning
+      -s=<integer> required :: it is the number of chars (the size) to clean (withdraw from filename)
+      -e=<extension> optional :: it is the file's extension
+    ===========================================
+    '''
+    sys.exit(0)
 
   def process_cli_args(self):
     for arg in sys.argv:
@@ -35,8 +61,8 @@ class Args:
         self.file_ext = arg[len('-e=') : ]
 
   def check_if_pos_and_size_were_set(self):
-    if self.pos_ini == None or self.size == None or self.file_ext == None:
-      print_explanation_and_exit()
+    if self.pos_ini == None or self.size == None:
+      self.print_explanation_and_exit()
 
   def get_ext_with_period(self):
     return '.%s' %self.file_ext  # file_ext does NOT have the beginning period ('.')
@@ -49,14 +75,20 @@ file_ext = %(file_ext)s
 ''' %{'pos_ini':self.pos_ini, 'size':self.size,'file_ext':self.file_ext}
     return outStr
 
+
 class Rename(object):
+  '''
+  This class does the renaming.
+  The explanation of the renaming it does is found above in the module's s__doc__ string.
+  '''
 
   def __init__(self, pos_ini, size, file_ext = None, mockFileList=[]):
     '''
 
-    :param pos_ini:
-    :param size:
-    :param file_ext:
+    :param pos_ini: required :: it is the string index to begin the char-cleaning
+    :param size: required :: it is the number of chars (the size) to clean (withdraw from filename)
+    :param file_ext: optional :: it is the file's extension
+    :param mockFileList: list used for testing, with messing up with the files in the current folder
     '''
 
     self.pos_ini = pos_ini
@@ -68,8 +100,8 @@ class Rename(object):
 
   def process(self):
     '''
-    Do not run the self.return_test_str_with_mockFileList() from here, otherwise an infinite loop will occur!
-    :return:
+
+    :return: n_of_renames
     '''
     n_of_renames = 0
     if self.mockFileList != []:
@@ -83,6 +115,12 @@ class Rename(object):
 
   def get_elligible_file_pairs_for_rename(self):
     '''
+    Both
+      + process() without "mocking mode" (the mockFileList filled-in) and
+      + run_test_str_with_mockFileList() issue this method
+
+    In mock mode, the mockFileList will be used
+    In "folder mode", ie, in true-run mode, the current folder file listing will be used
 
     :return:
     '''
@@ -130,7 +168,7 @@ class Rename(object):
   def show_renames_and_ask_confirmation(self):
     '''
 
-    :return:
+    :return: a boolean confirmation whether to rename files or not
     '''
     if len(self.rename_pairs) == 0:
       print ('No files in folder are under the parameters for renames (pos_ini=%d, pos_fim=%d, file_ext=%s)' %(self.pos_ini, self.size, self.file_ext) )
@@ -153,7 +191,7 @@ class Rename(object):
   def do_renames(self):
     '''
 
-    :return:
+    :return: n_of_renames
     '''
 
     n_of_renames = 0
@@ -178,8 +216,9 @@ class Rename(object):
 
   def run_test_str_with_mockFileList(self):
     '''
+    This is an ad hoc testing method that uses the mockFileList class' attribute
 
-    :return:
+    :return: outStr :: the string text that shows original filenames and renamed (new) filenames
     '''
     if self.mockFileList == []:
       return 'mockFileList is EMPTY!'
@@ -195,7 +234,7 @@ class Rename(object):
       outStr += str(i)
       outStr += " => Old Name = [%s]" %original_filename
       outStr += "\n"
-      outStr += "New Name = [%s]" %new_filenameg
+      outStr += "New Name = [%s]" %new_filename
       outStr += "\n"
     return outStr
 
@@ -235,7 +274,8 @@ youtube-ids.txt*
   '''
   mockFileList = str_files.split('\n')
   rename = Rename(3, 2, 'mp4', mockFileList)
-  print ( rename.return_test_str_with_mockFileList() )
+  result_str = rename.run_test_str_with_mockFileList()
+  print ( result_str )
 
 
 def process():
@@ -246,6 +286,6 @@ def process():
   rename.process()
 
 if __name__ == '__main__':
-  # test_ad_hoc()
   process()
+  # test_ad_hoc()
   # unittest.main()
