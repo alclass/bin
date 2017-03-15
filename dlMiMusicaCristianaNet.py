@@ -50,7 +50,8 @@ def print_arg_explanation_and_exit():
 
 class WgetComm():
 	def __init__(self, dict_list):
-		self.wget_commands = []
+
+		# self.wget_commands = []
 		self.dict_list = dict_list
 		self.follow_process()
 
@@ -60,15 +61,18 @@ class WgetComm():
 			self.exec_comms()
 
 	def mount_wget_commands(self):
-		for i, d in enumerate(self.dict_list):
+		for i, mp3_info_dict in enumerate(self.dict_list):
 			n = i + 1
-			title = d['title']
-			url = d['mp3']
-			comm = 'wget -c %(url)s -O "%(n)s %(title)s.mp3"' %{'n':str(n).zfill(2), 'url':url, 'title':title}
-			self.wget_commands.append(comm)
+			title = mp3_info_dict['title']
+			url   = mp3_info_dict['mp3']
+			comm   = 'wget -c %(url)s -O "%(n)s %(title)s.mp3"' %{'n':str(n).zfill(2), 'url':url, 'title':title}
+			mp3_info_dict['comm'] = comm
+			#self.wget_commands.append(comm)
 		
 	def print_comms(self):
-		for i, comm in enumerate(self.wget_commands):
+		for i, mp3_info_dict in enumerate(self.dict_list):
+		# for i, comm in enumerate(self.wget_commands):
+			comm = mp3_info_dict['comm']
 			print i+1, comm
 
 	def confirm_downloads(self):
@@ -80,7 +84,13 @@ class WgetComm():
 		return True
 
 	def exec_comms(self):
-		for comm in self.wget_commands:
+		total = len(self.dict_list)
+		for i, mp3_info_dict in enumerate(self.dict_list):
+		# for i, comm in enumerate(self.wget_commands):
+			info_dict = self.dict_list[i]
+			print '-'*40
+			print i+1, 'of',total, '=>>> Downloading [', info_dict['title'], ']'
+			comm = mp3_info_dict['comm']
 			os.system(comm)
 
 def pickup_dict_list_arg():
