@@ -49,11 +49,28 @@ def print_arg_explanation_and_exit():
 
 
 class WgetComm():
+	
 	def __init__(self, dict_list):
 
-		# self.wget_commands = []
 		self.dict_list = dict_list
+		self.local_folder_name = None # to be found
+		self.setLocalFolderName()
+		# ==>>> go process!
 		self.follow_process()
+		
+	def setLocalFolderName(self):
+		'''
+		self.local_folder_name is the name of the current executing folder, ie, the '.''s name
+		This attribute is a string (str) and only used for printing, ie, for improving output info to the user
+		Even if its retrieval fails (see the try/except block in this method), the guarding abspath str will do okay as an output info
+		'''
+		localdir_abspath = os.path.abspath('.')
+		local_folder_name = str(localdir_abspath) # to be changed in if the try/except block below doesn't raise
+		try:
+			_, local_folder_name = os.path.split(localdir_abspath)
+		except OSError:
+			pass
+		self.local_folder_name = local_folder_name
 
 	def follow_process(self):
 		self.mount_wget_commands()
@@ -67,7 +84,6 @@ class WgetComm():
 			url   = mp3_info_dict['mp3']
 			comm   = 'wget -c %(url)s -O "%(n)s %(title)s.mp3"' %{'n':str(n).zfill(2), 'url':url, 'title':title}
 			mp3_info_dict['comm'] = comm
-			#self.wget_commands.append(comm)
 		
 	def print_comms(self):
 		for i, mp3_info_dict in enumerate(self.dict_list):
@@ -76,8 +92,14 @@ class WgetComm():
 			print i+1, comm
 
 	def confirm_downloads(self):
+		print '='*40
 		print 'Is the list of wget downloads below correct and consistent?'
+		print '-'*40
 		self.print_comms()
+		total = len(self.dict_list)
+		print '-'*40
+		print 'Total:', total, 'for folder [[', self.local_folder_name, ']]'
+		print '='*40
 		ans = raw_input(' ==>>> Enter [y/N] and [ENTER] to continue ==>>> ')
 		if ans not in ['y','Y']:
 			return False
@@ -89,7 +111,7 @@ class WgetComm():
 		# for i, comm in enumerate(self.wget_commands):
 			info_dict = self.dict_list[i]
 			print '-'*40
-			print i+1, 'of',total, '=>>> Downloading [', info_dict['title'], ']'
+			print i+1, 'of',total, '=>>> Downloading [', info_dict['title'], '] in [', self.local_folder_name, ']'
 			comm = mp3_info_dict['comm']
 			os.system(comm)
 
