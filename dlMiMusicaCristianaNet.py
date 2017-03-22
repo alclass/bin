@@ -50,8 +50,9 @@ def print_arg_explanation_and_exit():
 
 class WgetComm():
 	
-	def __init__(self, dict_list):
+	def __init__(self, dict_list, no_confirmation_mode = False):
 
+		self.no_confirmation_mode = no_confirmation_mode
 		self.dict_list = dict_list
 		self.local_folder_name = None # to be found
 		self.setLocalFolderName()
@@ -100,6 +101,8 @@ class WgetComm():
 		print '-'*40
 		print 'Total:', total, 'for folder [[', self.local_folder_name, ']]'
 		print '='*40
+		if self.no_confirmation_mode:
+			return True
 		ans = raw_input(' ==>>> Enter [y/N] and [ENTER] to continue ==>>> ')
 		if ans not in ['y','Y']:
 			return False
@@ -116,8 +119,16 @@ class WgetComm():
 			os.system(comm)
 
 def pickup_dict_list_arg():
+	no_confirmation_mode = False
+	for arg in sys.argv:
+		if arg == '-y':
+			no_confirmation_mode = True
+			break
 	try:
-		data_filename = sys.argv[1]
+		if no_confirmation_mode:
+			data_filename = sys.argv[2]
+		else:			
+			data_filename = sys.argv[1]
 		jsarray = open(data_filename).read()
 		jsarray = jsarray.rstrip(' ;\t\r\n') # in case the user left an ending semicolon, it will strip off, otherwise the eval() will raise an exception
 		dict_list = eval(jsarray)
@@ -136,14 +147,14 @@ def pickup_dict_list_arg():
 		Exiting.
 		'''
 		sys.exit(1)
-	return dict_list
+	return dict_list, no_confirmation_mode
 
 def process():
 	if '-h' in sys.argv:
 		print_arg_explanation_and_exit()
 		pass
-	dict_list = pickup_dict_list_arg()
-	wComm = WgetComm(dict_list)
+	dict_list, no_confirmation_mode = pickup_dict_list_arg()
+	wComm = WgetComm(dict_list, no_confirmation_mode)
 
 if __name__ == '__main__':
 	process()
