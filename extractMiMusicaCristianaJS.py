@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
 import sys
+'''
+This script extracts a Java Script array from the standard input:
+  input:  an html is passed in
+  output: the JS-array (eval'ed later by Python)
+  
+The extracted array is then used by the download script (dlMiMusicaCristianaNet.py)
+'''
 
 phrase_start = 'var list = [{"'
 phrase_end   = '"}];'
