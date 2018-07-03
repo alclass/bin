@@ -3,6 +3,7 @@ bin_local_settings.py
 .project
 .pydevproject
 .settings
+.vscode/
 oscillator
 pyidle
 source-ifort-path

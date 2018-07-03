@@ -89,6 +89,7 @@ class WgetComm():
 		for i, mp3_info_dict in enumerate(self.dict_list):
 			n = i + 1
 			title = mp3_info_dict['title']
+			title = title.replace('/', '_')
 			url   = mp3_info_dict['mp3']
 			comm   = 'wget -c %(url)s -O "%(n)s %(title)s.mp3"' %{'n':str(n).zfill(2), 'url':url, 'title':title}
 			mp3_info_dict['comm'] = comm
