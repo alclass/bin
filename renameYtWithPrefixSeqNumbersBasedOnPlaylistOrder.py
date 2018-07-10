@@ -12,22 +12,28 @@ import glob, os, sys
 from dlYouTubeMissingVideoIdsOnLocalDir import get_videoid_from_filename        
 
 def doRename(mp4s, ids, doRenameThem=False):
-  renametuplelist = [(0,0)]*len(mp4s)
+  renametuplelist = []; usedfilenames = []
   for mp4 in mp4s:
     if not os.path.isfile(mp4):
-      print('File', mp4, 'not found. Skipping next...')
+      print('File', mp4, 'not found having an equivalent in ids. Skipping to next one if any...')
       continue
     videoid = get_videoid_from_filename(mp4)
-    if videoid in ids:
-      try:
-        index = ids.index(videoid)
-      except ValueError:
-        print('yt-videoid', videoid, 'not found. Skipping next...')
-        continue
-      seqnumber = index + 1
-      newName = str(seqnumber).zfill(2) + ' ' + mp4
-      renametuplelist[index] = (mp4, newName)
+    if not videoid in ids:
+      print('File', mp4, 'not found having an equivalent in ids. Skipping to next one if any...')
+      continue
+    try:
+      index = ids.index(videoid)
+    except ValueError:
+      print('yt-videoid', videoid, 'not found. Skipping next...')
+      # this is logically not possible due to previous 'if' (a re-raise is a TODO here)
+      raise ValueError
+    seqnumber = index + 1
+    newName = str(seqnumber).zfill(2) + ' ' + mp4
+    if mp4 not in usedfilenames:
+      renametuplelist.append((mp4, newName))
+      usedfilenames.append(mp4)
 
+  nOfRenames = 0
   for i, tupl in enumerate(renametuplelist):
     seqNumber = i + 1
     currentName, newName = tupl
@@ -36,20 +42,30 @@ def doRename(mp4s, ids, doRenameThem=False):
     print(' => ', newName)
     if doRenameThem:
       os.rename(currentName, newName)
+      nOfRenames += 1
 
-  if doRenameThem is False:
+  print('doRename with', len(renametuplelist), 'files and', len(ids), 'ids')
+
+  if doRenameThem is True:
+      print('nOfRenames = ', nOfRenames) 
+
+  else:  # ie if doRenameThem is False:
     ans = input('Do rename files? [type in y or Y for Yes, anything else for No] ')
     if ans in ['y', 'Y']:
       doRename(mp4s, ids, doRenameThem=True)
 
+charSize = lambda idword: len(idword) == 11 # this lambda is intended to be used in a 'filter', each element is filtered-in if lambda returns True for it (filterOutNon11Char will used this later below)
+wordStrip = lambda idword : idword.strip()
 def extract_ids():
   text = open(DEFAULT_YTPL_ORDER_TXT_IDS_FILE).read()
   if text is not None:
     ids = text.split('\n')
-    if '' in ids:
-      ids.remove('')
+    stripMap = map(wordStrip, ids)
+    ids = [i for i in stripMap]
+    filterOutNon11Char = filter(charSize, ids) # only 11-char idwords are allowed, '', '\n' etc. are filtered out
+    ids = [i for i in filterOutNon11Char]
     return ids
-  return []
+  return [] # if it has not returned above, text is None
 
 DEFAULT_YTPL_ORDER_TXT_IDS_FILE = 'youtube-ids.txt'
 def process():
@@ -64,4 +80,3 @@ def process():
           
 if __name__ == '__main__':
   process()
-  
