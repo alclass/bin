@@ -14,7 +14,7 @@ Created on 10/jul/2018
 @author: friend
 '''
 import glob, datetime, os, sys
-from dlYouTubeMissingVideoIdsOnLocalDir import get_videoid_from_filename        
+# from dlYouTubeMissingVideoIdsOnLocalDir import get_videoid_from_filename        
 
 def create_renametuplelist(date_n_filename_tuple_list, doRenameThem=False):
   renametuplelist = []
@@ -51,6 +51,8 @@ def doRename(p_renametuplelist=[], doRenameThem=False):
     if doRenameThem:
       os.rename(currentName, newName)
       nOfRenames += 1
+
+  print('doRename with', len(renametuplelist), 'files.')
 
   if doRenameThem is True:
       print('nOfRenames = ', nOfRenames) 
@@ -100,15 +102,23 @@ def extract_date_n_filename_tuple_list(files):
     date_n_filename_tuple_list.append(tupl)
   return date_n_filename_tuple_list
 
-DEFAULT_YTPL_ORDER_TXT_IDS_FILE = 'youtube-ids.txt'
+def find_file_extensions_in_args():
+  ext_list_in_args = ['mp4'] # default
+  for arg in sys.argv:
+    if arg.startswith('-e='):
+      ext_args_str = arg[ len('-e=') : ]
+      ext_args_str = ext_args_str.strip(', ')
+      ext_list_in_args = ext_args_str.split(',')
+      break
+  return ext_list_in_args
+
 def process():
-  files = os.listdir('.')
-  if DEFAULT_YTPL_ORDER_TXT_IDS_FILE not in files:
-    print('File', DEFAULT_YTPL_ORDER_TXT_IDS_FILE, 'is missing on current folder. Script cannot proceed.')
-    sys.exit(1)
-  mp4s = glob.glob('*.mp4')
-  date_n_filename_tuple_list = extract_date_n_filename_tuple_list(mp4s)
-  print('doRename with', len(mp4s), 'files and', len(date_n_filename_tuple_list), 'date_n_filename_tuples')
+  ext_list_in_args = find_file_extensions_in_args()
+  targetfiles = []
+  for ext in ext_list_in_args:
+    targetfiles += glob.glob('*.' + ext)
+  date_n_filename_tuple_list = extract_date_n_filename_tuple_list(targetfiles)
+  print('doRename with', len(targetfiles), 'files and', len(date_n_filename_tuple_list), 'date_n_filename_tuples')
   renametuplelist = create_renametuplelist(date_n_filename_tuple_list)
   doRename(renametuplelist)
           
