@@ -4,8 +4,8 @@
 
 '''
 import sys
-import bin_local_settings as bls # local bin settings
-sys.path.insert(0, bls.UTUBEAPP_PATH)
+import local_settings as ls # local Python (bin) settings
+sys.path.insert(0, ls.UTUBEAPP_PATH)
 # from shellclients.dlYouTubeWithIdsOnTxtFile import VideoidsGrabberAndDownloader
 from uTubeOurApps.shellclients.dlYouTubeWithIdsOnTxtFile import VideoidsGrabberAndDownloader
 

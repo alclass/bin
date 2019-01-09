@@ -1,19 +1,17 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 import glob, json, os, string, subprocess, sys #, shutil, sys
 
 def print_explanation_and_exit():
-  print 'Arguments to the script:'
-  print '-e=<file-extension> (required)'
+  print('Arguments to the script:')
+  print('-e=<file-extension> (required)')
   sys.exit(0)
 
 def probe_n_return_json(vid_file_path):
   '''
 
     NOT YET WORKING TO THE PROBABLY THE BYTES/STRING PROBLEM FROM THE PIPE-FFPROBE
-
-  Give a json from ffprobe command line
-
-  @vid_file_path : The absolute (full) path of the video file, string.
+    Give a json from ffprobe command line
+    @vid_file_path : The absolute (full) path of the video file, string.
 
       This function was copied from the one in StackOverflow at:
         https://stackoverflow.com/questions/3844430/how-to-get-the-duration-of-a-video-in-python
@@ -34,6 +32,7 @@ def probe_n_return_json(vid_file_path):
 
   pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
   out, err = pipe.communicate()
+  # print(out, err)
   return json.loads(str(out))
 
 def transform_duration_from_sec_to_min(duration_in_sec):
@@ -45,11 +44,13 @@ def get_duration_str(fil): #
   duration_in_sec = the_streams_key_dict['duration']
   duration_in_min = transform_duration_from_sec_to_min(duration_in_sec)
   if duration_in_min <= 60:
-    duration_str = str(duration_in_min)
+	# Notice that output is dd' where dd is value in minutes (eg. 59' or 7')
+    duration_str = str(duration_in_min) + "'"
   else:
+	# Notice that output is 1hdd where dd is value in minutes (eg. 1h59 or 1h07)
     duration_in_hours = duration_in_min // 60
     remainder = duration_in_min - (duration_in_hours*60)
-    duration_str = str(duration_in_hours) + 'h' + str(remainder)
+    duration_str = str(duration_in_hours) + 'h' + str(remainder).zfill(2)
   return duration_str
 
 # args = ['-e='] # -e is file extension
@@ -80,22 +81,23 @@ def rename(args):
       name, ext = os.path.splitext(fil)
       # print 'name, ext', name, ext
       tamNameWithoutExt = len(name)
-      if ext <> None:
-        if ext <> args.get_ext_with_period():
+      if ext != None:
+        if ext != args.get_ext_with_period():
           continue
       words = fil.split(' ')
       if len(words) < 2:
         continue
       duration_str = get_duration_str(fil) # probe_n_return_json
-      newName = words[0] + ' ' + duration_str + "' " + ' '.join(words[1:])
+      newName = words[0] + ' ' + duration_str + " " + ' '.join(words[1:])
+		
       c += 1
-      print c, ' ======== Rename Pair ========'
-      print 'FROM: >>>' + fil
-      print 'TO:   >>>' + newName
+      print( c, ' ======== Rename Pair ========' )
+      print( 'FROM: >>>' + fil )
+      print( 'TO:   >>>' + newName )
       if i==1:
         os.rename(fil, newName)
     if c==0:
-      print 'No files are sized above position', posFrom
+      print( 'No files are sized above position', posFrom )
       break
     if i==0 and c > 0:
       ans = raw_input('Are you sure? (y/n) ')
