@@ -13,6 +13,7 @@ from dlYouTubeMissingVideoIdsOnLocalDir import get_videoid_from_filename
 
 def doRename(mp4s, ids, doRenameThem=False):
   renametuplelist = []; usedfilenames = []
+  n_to_align_left_zeroes = len(str(len(ids))) # another option is to encapsulate a function that uses math.log10()
   for mp4 in mp4s:
     if not os.path.isfile(mp4):
       print('File', mp4, 'not found having an equivalent in ids. Skipping to next one if any...')
@@ -28,7 +29,7 @@ def doRename(mp4s, ids, doRenameThem=False):
       # this is logically not possible due to previous 'if' (a re-raise is a TODO here)
       raise ValueError
     seqnumber = index + 1
-    newName = str(seqnumber).zfill(2) + ' ' + mp4
+    newName = str(seqnumber).zfill(n_to_align_left_zeroes) + ' ' + mp4
     if mp4 not in usedfilenames:
       renametuplelist.append((mp4, newName))
       usedfilenames.append(mp4)
