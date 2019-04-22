@@ -40,7 +40,12 @@ def transform_duration_from_sec_to_min(duration_in_sec):
 
 def get_duration_str(fil): # 
   json = probe_n_return_json(fil)
-  the_streams_key_dict = json['streams'][1]
+  try:
+	the_streams_key_dict = json['streams'][1]
+  except IndexError:
+	# the following alternative was noted when IndexError was raised when renaming mp3's
+	# TO-DO: try to improve later on this when possible
+    the_streams_key_dict = json['streams'][0]
   duration_in_sec = the_streams_key_dict['duration']
   duration_in_min = transform_duration_from_sec_to_min(duration_in_sec)
   if duration_in_min <= 60:
