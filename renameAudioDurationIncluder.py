@@ -38,15 +38,42 @@ def probe_n_return_json(vid_file_path):
 def transform_duration_from_sec_to_min(duration_in_sec):
   return int(round(float(duration_in_sec) / 60, 0))
 
-def get_duration_str(fil): # 
-  json = probe_n_return_json(fil)
+def get_duration_in_sec(json_as_dict):
+  '''
+  :param json_as_dict:
+  :return:
+
+  The approach here will be as follows:
+  1) first, try to find the duration key inside json_as_dict['streams']
+  2) if the above attempt fails, then try to find the duration key inside json_as_dict['format']
+  3) if both above fails, then exit(1) with error "duration not found"
+
+  Chances to improve this routine:
+  1) try to find a way to introspect the whole json_as_dict,
+    so that it would look up the duration key wherever it has a chance to be
+  2) if the above is implementable,
+    that would guarantee "duration not found"
+    in case duration is really missing
+  '''
   try:
-	the_streams_key_dict = json['streams'][1]
-  except IndexError:
-	# the following alternative was noted when IndexError was raised when renaming mp3's
-	# TO-DO: try to improve later on this when possible
-    the_streams_key_dict = json['streams'][0]
-  duration_in_sec = the_streams_key_dict['duration']
+    # 1st try: look up duration key from dict inside key 'streams', second element from list
+    dict_that_has_duration = json_as_dict['streams'][1]
+    duration_in_sec = dict_that_has_duration['duration']
+  except (IndexError, KeyError) as e:
+    pass
+  try:
+    # 2nd try: look up duration key from dict inside key 'format'
+    dict_that_has_duration = json_as_dict['format']
+    duration_in_sec = dict_that_has_duration['duration']
+  except (IndexError, KeyError) as e:
+    print (json_as_dict)
+    print ("Couldn't find duration key, program cannot continue.")
+    sys.exit(1)
+  return duration_in_sec
+
+def get_duration_str(fil): #
+  json = probe_n_return_json(fil)
+  duration_in_sec = get_duration_in_sec(json)
   duration_in_min = transform_duration_from_sec_to_min(duration_in_sec)
   if duration_in_min <= 60:
 	# Notice that output is dd' where dd is value in minutes (eg. 59' or 7')
