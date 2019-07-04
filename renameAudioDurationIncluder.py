@@ -59,6 +59,10 @@ def get_duration_in_sec(json_as_dict):
     # 1st try: look up duration key from dict inside key 'streams', second element from list
     dict_that_has_duration = json_as_dict['streams'][1]
     duration_in_sec = dict_that_has_duration['duration']
+    # got it, so return it right away
+    # (but how will we know whether or not this exception is always thrown
+    # and code might be refactored to leave only the 2nd try below?)
+    return duration_in_sec
   except (IndexError, KeyError) as e:
     pass
   try:
