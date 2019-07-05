@@ -1,9 +1,33 @@
 #!/usr/bin/env python2
 import glob, json, os, string, subprocess, sys #, shutil, sys
 
+DEFAULT_EXTENSION = 'mp4'
+
 def print_explanation_and_exit():
-  print('Arguments to the script:')
-  print('-e=<file-extension> (required)')
+  print('''
+  Script's function:
+  ==================
+
+  This script tries to find the duration of media files in a folder 
+  and puts this duration in-between the first and second word of its name.
+  
+  Example:
+  
+  Suppose current folder has the following file:
+  "This video is about Physics.mp4"
+  
+  Supposing it has 11 minutes duration, the script will rename it to:
+  "This 11' video is about Physics.mp4"
+  ie, it puts a ((11')) (an eleven [one one] and a plics)
+      in-between "This" and "video".
+    
+  Arguments to the script:
+  =======================
+
+  -e=<file-extension> (if not given, default is %s [do not use the dot '.' before extension])
+  -y avoids confirmation, ie, it does the renaming without asking a confirm Yes or No
+  -h or --help prints this help message
+''') %DEFAULT_EXTENSION
   sys.exit(0)
 
 def probe_n_return_json(vid_file_path):
@@ -93,32 +117,38 @@ def get_duration_str(fil): #
 class Args:
   def __init__(self):
     self.ext = None
+    self.confirm_before_rename = True
     self.process_cli_args()
     self.check_if_at_least_ext_was_set()
 
   def process_cli_args(self):
     for arg in sys.argv:
+      if arg in ['-h', '--help']:
+        print_explanation_and_exit()
+      if arg.startswith('-y'):
+        self.confirm_before_rename = False
       if arg.startswith('-e='):
-        self.ext = arg[len('-e=') : ]
+          self.ext = arg[len('-e=') : ]
 
   def check_if_at_least_ext_was_set(self):
     if self.ext == None:
-      print_explanation_and_exit()
+      self.ext = DEFAULT_EXTENSION
 
   def get_ext_with_period(self):
     return '.%s' %self.ext
 
-def rename(args):        
+def rename(args, confirm_before_rename=True):
   files=os.listdir('.')
   files.sort()
   for i in range(0,2):
     c=0
+    extension_param = args.get_ext_with_period()
     for fil in files:
       name, ext = os.path.splitext(fil)
       # print 'name, ext', name, ext
       tamNameWithoutExt = len(name)
       if ext != None:
-        if ext != args.get_ext_with_period():
+        if ext != extension_param:
           continue
       words = fil.split(' ')
       if len(words) < 2:
@@ -133,16 +163,17 @@ def rename(args):
       if i==1:
         os.rename(fil, newName)
     if c==0:
-      print( 'No files are sized above position', posFrom )
+      print( 'No files are renameable (either no files with renaming extension (%s) in folder or namesizes are too short.' %extension_param )
       break
     if i==0 and c > 0:
-      ans = raw_input('Are you sure? (y/n) ')
-      if ans != 'y':
-        break
+      if confirm_before_rename:
+        ans = raw_input('Are you sure? (y/n) ')
+        if ans != 'y':
+          break
 
 def process():
   args = Args()
-  rename(args)
+  rename(args, args.confirm_before_rename)
 
 if __name__ == '__main__':
   process()

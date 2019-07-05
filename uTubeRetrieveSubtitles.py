@@ -18,6 +18,7 @@ Explanation:
 
 YOUTUBE_VIDEOID_CHARSIZE = 11
 DEFAULT_EXTENSION = 'mp4'
+SUBTITLE_DEFAULT_EXTENSION = 'vtt'
 FORBIDDEN_CHARS_IN_VIDEOID = \
   ['!', '@', '#', '$', '¨', '&', '%', '*', '(', ')', '[', ']', '{', '}',
    '+', '=', ';', ',', ';', '?', '<', '>',
@@ -42,8 +43,9 @@ def extract_video_id(filename):
 
 class SubtitleProcessor:
 
-  def __init__(self, extension=DEFAULT_EXTENSION):
+  def __init__(self, extension=DEFAULT_EXTENSION, subtitle_extension=SUBTITLE_DEFAULT_EXTENSION):
     self.extension = extension
+    self.subtitle_extension = subtitle_extension
     sorted(self.extension)
     self.videoids = []
     self.subtitleurls_dict = {}
@@ -79,8 +81,8 @@ class SubtitleProcessor:
       os.system(comm)
 
   def rename_subtitles(self):
-    files = glob.glob('*.'+'.vtt')
-    for eachSubtitle in files:
+    files = glob.glob('*.'+'.' + self.subtitle_extension)
+    for i, eachSubtitle in enumerate(files):
       videoid = extract_video_id(eachSubtitle)
       if videoid is None:
         continue
@@ -88,9 +90,11 @@ class SubtitleProcessor:
       extensionless_media_name, _ = os.path.splitext(media_filename)
       _, subtitle_ext = os.path.splitext(eachSubtitle)
       newSubtitleName = media_filename + '.' + subtitle_ext
-      print ('rename')
-      print ('from', eachSubtitle)
-      print ('to', newSubtitleName)
+      if os.path.ispath(newSubtitleName):
+        continue
+      print (i+1, ' ==>>> Rename:')
+      print ('from ->', eachSubtitle)
+      print ('to   ->', newSubtitleName)
 
   def process(self):
     '''

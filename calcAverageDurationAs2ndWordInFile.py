@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 import glob, sys
 
+DEFAULT_EXTENSION = 'mp4'
+
 def calcAverageDurationAs2ndWordInFile(files):
   '''
 
@@ -56,8 +58,7 @@ def get_files_from_args():
   '''
   ext = get_extension_from_args()
   if ext is None:
-    print('Please use the -e=<extension> to pick up a file extension to be used for the duration average calculation.')
-    sys.exit(0)
+    ext = DEFAULT_EXTENSION
   files = glob.glob("*." + ext)
   return files
 
