@@ -16,51 +16,7 @@ Created on 10/jul/2018
 import glob, datetime, os, sys
 # from dlYouTubeMissingVideoIdsOnLocalDir import get_videoid_from_filename        
 
-def create_renametuplelist(date_n_filename_tuple_list, doRenameThem=False):
-  renametuplelist = []
-  for date_n_filename_tuple in date_n_filename_tuple_list:
-    strDate, oldfilename = date_n_filename_tuple
-    newfilename = strDate + ' ' + oldfilename
-    renametuple = oldfilename, newfilename
-    renametuplelist.append(renametuple)
-  return renametuplelist
-
-def doRename(p_renametuplelist=[], doRenameThem=False):
-  usedfilenames = []; renametuplelist = []
-  for renametuple in p_renametuplelist:
-    oldfilename, newfilename = renametuple
-    if not os.path.isfile(oldfilename):
-      print('File', oldfilename, 'not found having an equivalent in ids. Skipping to next one if any...')
-      continue
-    if newfilename not in usedfilenames and oldfilename not in usedfilenames:
-      renametuplelist.append((oldfilename, newfilename))
-      usedfilenames.append(oldfilename)
-      usedfilenames.append(newfilename)
-    else:
-      print('Either', oldfilename, 'or', oldfilename, ' are already in renaming queue. Skipping to next one if any...')
-      continue
-
-  nOfRenames = 0
-  for i, tupl in enumerate(renametuplelist):
-    seqNumber = i + 1
-    currentName, newName = tupl
-    print('Rename n.', seqNumber)
-    print(' => ', currentName)
-    print(' => ', newName)
-
-    if doRenameThem:
-      os.rename(currentName, newName)
-      nOfRenames += 1
-
-  print('doRename with', len(renametuplelist), 'files.')
-
-  if doRenameThem is True:
-      print('nOfRenames = ', nOfRenames) 
-
-  else:  # ie if doRenameThem is False:
-    ans = input('Do rename files? [type in y or Y for Yes, anything else for No] ')
-    if ans in ['y', 'Y']:
-      doRename(renametuplelist, doRenameThem=True)
+DEFAULT_EXTENSION = 'mp4'
 
 def doesFilenameAlreadyHaveADatePrefix(eachFile):
   if len(eachFile) < 10:
@@ -102,25 +58,115 @@ def extract_date_n_filename_tuple_list(files):
     date_n_filename_tuple_list.append(tupl)
   return date_n_filename_tuple_list
 
+
+class Rename:
+
+  def __init__(self, targetfiles, boolForInputAskingRenames=True):
+    self.targetfiles = targetfiles
+    self.date_n_filename_tuple_list = []
+    self.renametuplelist = []
+    self.boolForInputAskingRenames = boolForInputAskingRenames
+    self.boolConfirmedRenames = None
+    self.processRename()
+
+  def processRename(self):
+    '''
+
+    :return:
+    '''
+    self.date_n_filename_tuple_list = extract_date_n_filename_tuple_list(self.targetfiles)
+    print('Renames with', len(self.targetfiles), 'files and', len(self.date_n_filename_tuple_list), 'date_n_filename_tuples')
+    if len(self.date_n_filename_tuple_list) == 0:
+      print ('No pair of files to renames. Either directory is empty or files already are date-prefixed.')
+      return False # end of class-processing
+    self.create_renametuplelist()
+    self.printOutRenames()
+    self.boolConfirmedRenames = True
+    if self.boolForInputAskingRenames:
+      self.askInputConfirmRenames()
+    if self.boolConfirmedRenames:
+      self.doRename()
+    return True # end of class-processing
+
+  def create_renametuplelist(self):
+    '''
+
+    :return:
+    '''
+    localRenametuplelist = []
+    for date_n_filename_tuple in self.date_n_filename_tuple_list:
+      strDate, oldfilename = date_n_filename_tuple
+      newfilename = strDate + ' ' + oldfilename
+      renametuple = oldfilename, newfilename
+      localRenametuplelist.append(renametuple)
+
+    usedfilenames = []
+    self.renametuplelist = []
+    for renametuple in localRenametuplelist:
+      oldfilename, newfilename = renametuple
+      if not os.path.isfile(oldfilename):
+        print('File', oldfilename, 'not found having an equivalent in ids. Skipping to next one if any...')
+        continue
+      if newfilename not in usedfilenames and oldfilename not in usedfilenames:
+        self.renametuplelist.append((oldfilename, newfilename))
+        usedfilenames.append(oldfilename)
+        usedfilenames.append(newfilename)
+      else:
+        print('Either', oldfilename, 'or', oldfilename, ' are already in renaming queue. Skipping to next one if any...')
+        continue
+
+  def printOutRenames(self):
+
+    for i, tupl in enumerate(self.renametuplelist):
+      seqNumber = i + 1
+      currentName, newName = tupl
+      print('Rename n.', seqNumber)
+      print(' => ', currentName)
+      print(' => ', newName)
+
+  def askInputConfirmRenames(self):
+    ans = input('Do rename files? (Y/n) ')
+    self.boolConfirmedRenames = True
+    if ans in ['n', 'N']:
+      self.boolConfirmedRenames = False
+
+  def doRename(self):
+
+    if not self.boolConfirmedRenames:
+      return
+
+    nOfRenames = 0
+    for renametuple in self.renametuplelist:
+      oldfilename, newfilename = renametuple
+      os.rename(oldfilename, newfilename)
+      nOfRenames += 1
+
+    print('nOfRenames = ', nOfRenames)
+
+
 def find_file_extensions_in_args():
-  ext_list_in_args = ['mp4'] # default
+  ext_list_in_args = [DEFAULT_EXTENSION] # default
+  boolForInputAskingRenames = True
   for arg in sys.argv:
+    if arg.startswith('-y'):
+      boolForInputAskingRenames = False
     if arg.startswith('-e='):
+      # notice if user enters more than -e, only the last one will hold
       ext_args_str = arg[ len('-e=') : ]
-      ext_args_str = ext_args_str.strip(', ')
-      ext_list_in_args = ext_args_str.split(',')
+      ext_list_in_args = ext_args_str.split(',') # no spacing is allowed in cli params
       break
-  return ext_list_in_args
+  args_dict = {'ext_list_in_args': ext_list_in_args, 'boolForInputAskingRenames':boolForInputAskingRenames}
+  return args_dict
 
 def process():
-  ext_list_in_args = find_file_extensions_in_args()
+  args_dict = find_file_extensions_in_args()
+  ext_list_in_args = args_dict['ext_list_in_args']
+  boolForInputAskingRenames = args_dict['boolForInputAskingRenames']
   targetfiles = []
   for ext in ext_list_in_args:
     targetfiles += glob.glob('*.' + ext)
-  date_n_filename_tuple_list = extract_date_n_filename_tuple_list(targetfiles)
-  print('doRename with', len(targetfiles), 'files and', len(date_n_filename_tuple_list), 'date_n_filename_tuples')
-  renametuplelist = create_renametuplelist(date_n_filename_tuple_list)
-  doRename(renametuplelist)
-          
+  # renameObj
+  _ = Rename(targetfiles, boolForInputAskingRenames)
+
 if __name__ == '__main__':
   process()

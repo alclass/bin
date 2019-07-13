@@ -8,12 +8,13 @@ def calcAverageDurationAs2ndWordInFile(files):
   '''
 
   '''
-  total_duration = 0
+  total_duration = 0; n_counts = 0
   for eachFile in files:
     try:
       word = eachFile.split()[1]
       if word.find('h') > -1:
         hours, minutes = word.split('h')
+        if minutes == '': minutes = 0 # 1h splits into ['1', '']
         introunded_individual_duration = int(hours)*60 + int(minutes)
       else:
         word = word.strip(" ',;-\r")
@@ -21,8 +22,11 @@ def calcAverageDurationAs2ndWordInFile(files):
       print(introunded_individual_duration, eachFile)
     except(ValueError, IndexError) as error:
       continue
-    total_duration += introunded_individual_duration 
-  average = total_duration / len(files)
+    total_duration += introunded_individual_duration
+    n_counts += 1
+  if n_counts == 0:
+    return 0
+  average = total_duration / n_counts # do not use len(files) because of the try/except block
   average = round(average)
   return average
 
