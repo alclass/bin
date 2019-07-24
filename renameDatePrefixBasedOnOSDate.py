@@ -154,7 +154,7 @@ def find_file_extensions_in_args():
       # notice if user enters more than -e, only the last one will hold
       ext_args_str = arg[ len('-e=') : ]
       ext_list_in_args = ext_args_str.split(',') # no spacing is allowed in cli params
-      break
+      # break # no break, wait in case a -y may appear
   args_dict = {'ext_list_in_args': ext_list_in_args, 'boolForInputAskingRenames':boolForInputAskingRenames}
   return args_dict
 
