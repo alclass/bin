@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 import glob, json, os, string, subprocess, sys #, shutil, sys
 
 DEFAULT_EXTENSION = 'mp4'
@@ -39,12 +39,10 @@ def probe_n_return_json(vid_file_path):
 
       This function was copied from the one in StackOverflow at:
         https://stackoverflow.com/questions/3844430/how-to-get-the-duration-of-a-video-in-python
+
   '''
-  if os.path.isfile(vid_file_path):
-    vid_file_path = str(vid_file_path)
-  if type(vid_file_path) != str:
+  if not os.path.isfile(vid_file_path):
     raise Exception('Give ffprobe a full file path of the video')
-    return
 
   command = ["ffprobe",
     "-loglevel",  "quiet",
@@ -57,7 +55,8 @@ def probe_n_return_json(vid_file_path):
   pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
   out, err = pipe.communicate()
   # print(out, err)
-  return json.loads(str(out))
+  # sys.exit(0)
+  return json.loads(out)
 
 def transform_duration_from_sec_to_min(duration_in_sec):
   return int(round(float(duration_in_sec) / 60, 0))
@@ -115,6 +114,9 @@ def get_duration_str(fil): #
 
 # args = ['-e='] # -e is file extension
 class Args:
+  '''
+
+  '''
   def __init__(self):
     self.ext = None
     self.confirm_before_rename = True
@@ -137,43 +139,112 @@ class Args:
   def get_ext_with_period(self):
     return '.%s' %self.ext
 
-def rename(args, confirm_before_rename=True):
-  files=os.listdir('.')
-  files.sort()
-  for i in range(0,2):
-    c=0
-    extension_param = args.get_ext_with_period()
-    for fil in files:
-      name, ext = os.path.splitext(fil)
-      # print 'name, ext', name, ext
-      tamNameWithoutExt = len(name)
-      if ext != None:
-        if ext != extension_param:
-          continue
-      words = fil.split(' ')
+  def get_extension(self):
+    if self.ext is None:
+      return DEFAULT_EXTENSION
+    return self.ext
+
+class Rename:
+
+  def __init__(self, args):
+    '''
+
+    :param confirm_before_rename:
+    '''
+    self.extension             = args.get_extension()
+    self.confirm_before_rename = args.confirm_before_rename
+    # self.abspath = os.path.dirname(os.path.abspath(__file__))
+    self.abspath = os.getcwd()
+    self.rename_pairs = []
+    self.processRenames()
+
+  def processRenames(self):
+    '''
+
+    :param self:
+    :return:
+    '''
+    self.findRenames()
+    self.showRenames()
+    doRename = False
+    if self.confirm_before_rename:
+      doRename = self.confirmRenames()
+    else:
+      doRename = True
+    if doRename:
+      self.renamePairs()
+
+  def findRenames(self):
+    '''
+
+    :return:
+    '''
+    files = glob.glob('*.' + self.extension)
+    files.sort()
+    for filename in files:
+      name, ext = os.path.splitext(filename)
+      if ext is None or ext == '':
+        continue
+      words = filename.split(' ')
       if len(words) < 2:
         continue
-      duration_str = get_duration_str(fil) # probe_n_return_json
+      fileabspath = os.path.join(self.abspath, filename)
+      duration_str = get_duration_str(fileabspath)  # probe_n_return_json
+      # if (duration_str) exists in source filename, do not buffer it to rename_pairs tuple list
+      if duration_str == words[1]:
+        continue
       newName = words[0] + ' ' + duration_str + " " + ' '.join(words[1:])
-		
-      c += 1
-      print( c, ' ======== Rename Pair ========' )
-      print( 'FROM: >>>' + fil )
-      print( 'TO:   >>>' + newName )
-      if i==1:
-        os.rename(fil, newName)
-    if c==0:
-      print( 'No files are renameable (either no files with renaming extension (%s) in folder or namesizes are too short.' %extension_param )
-      break
-    if i==0 and c > 0:
-      if confirm_before_rename:
-        ans = raw_input('Are you sure? (y/n) ')
-        if ans != 'y':
-          break
+      rename_tuple = ( filename, newName )
+      self.rename_pairs.append(rename_tuple)
+
+  def showRenames(self):
+    '''
+
+    :return:
+    '''
+    for i, rename_pair in enumerate(self.rename_pairs):
+      filename, newName = rename_pair
+      print(i+1, ' ======== Rename Pair ========')
+      print('FROM: >>>' + filename)
+      print('TO:   >>>' + newName)
+    if len(self.rename_pairs) == 0:
+      print(
+''' *** No files are renameable. ***
+    ==>>> Either:
+    1) no files with renaming extension (%s) in folder;
+    2) namesizes are too short or
+    3) files already have the duration mark.      
+''' %self.extension )
+
+
+  def confirmRenames(self):
+    '''
+
+    :return:
+    '''
+    n_renames = len(self.rename_pairs)
+    if n_renames > 0:
+      msg_for_input = 'Are you sure to  rename these (%d) files? (Y/n) ' %n_renames
+      ans = input(msg_for_input)
+      if ans in ['n','N']:
+        return False
+    return True
+
+  def renamePairs(self):
+    '''
+
+    :return:
+    '''
+    nOfRenames = 0
+    for i, rename_pair in enumerate(self.rename_pairs):
+      filename, newName = rename_pair
+      os.rename(filename, newName)
+      nOfRenames += 1
+    print('Total files renamed: %d' %nOfRenames)
 
 def process():
   args = Args()
-  rename(args, args.confirm_before_rename)
+  Rename(args)
 
 if __name__ == '__main__':
   process()
