@@ -149,6 +149,21 @@ class Rename:
   def __init__(self, args):
     '''
 
+    A note related to the os.getcwd() option used below.
+    Motivation:
+      when executing the pipe-cli to get the json information that includes media duration
+      the script sends out the absolute path to go out as parameter. To get the absolute path
+      where the script is executed, os.getcwd() was chosen.  Notice below that a more recent option
+      is available. That option used the newly pathlib.Path class.
+
+https://stackoverflow.com/questions/3430372/how-to-get-full-path-of-current-files-directory-in-python
+
+    Using Path is the recommended way since Python 3:
+
+    from pathlib import Path
+    print("File      Path:", Path(__file__).absolute())
+    print("Directory Path:", Path().absolute())
+
     :param confirm_before_rename:
     '''
     self.extension             = args.get_extension()
