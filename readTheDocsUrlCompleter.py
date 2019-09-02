@@ -107,7 +107,7 @@ class RtdocsDownload:
     urldict = {
       'format_id' : format_id,
       'project_name' : project_name,
-      'file_extension' :file_extension,
+      'file_extension' : file_extension,
     }
     url = URL_BASE %urldict
     comm = 'wget -c %s' %url
