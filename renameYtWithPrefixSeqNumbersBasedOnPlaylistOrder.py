@@ -4,6 +4,17 @@
 This script renames YouTube videos prefixing them with the 2-digit number
   that is the same as its ordered position in playlist.
 
+For this script to work, there must exist a file in folder named youtube-ids
+(or the given by parameter -n="<filename>").
+
+Let's see an example:
+
+if a file is named:
+     "file-foobar-XLJN4JfniH4.mp4"
+ and if XLJN4JfniH4 occupies the 3rd line in file youtube-ids.txt
+ (or the one under -n), the new filename will be:
+     "3 file-foobar-XLJN4JfniH4.mp4" (zfill left-zero-padding takes place if necessary)
+
 Created on 03/jul/2018
 
 @author: friend
@@ -40,6 +51,10 @@ class Arg:
     self.confirm_before_rename = True
     self.process_cli_args()
 
+  def print_explanation_and_exit(self):
+    print( __doc__ )
+    sys.exit(0)
+
   def process_cli_args(self):
     '''
 
@@ -47,7 +62,7 @@ class Arg:
     '''
     for arg in sys.argv:
       if arg in ['-h', '--help']:
-        print_explanation_and_exit()
+        self.print_explanation_and_exit()
       if arg.startswith('-y'):
         self.confirm_before_rename = False
       if arg.startswith('-e='):
@@ -126,6 +141,7 @@ class Rename:
     for filename in filenames:
       videoid = get_videoid_from_filename(filename)
       if not videoid in self.ytids:
+        print('videoid', videoid)
         print('File', filename, 'not found having an equivalent in ids. Skipping to next one if any...')
         continue
       try:
@@ -161,10 +177,11 @@ class Rename:
 
     :return:
     '''
-    msg_for_input = 'Confirm renames above with %d files and %d ids? (Y*/n) ' %(len(self.rename_pairs), len(self.ytids))
-    ans = input(msg_for_input)
-    if ans.startswith('y') or ans.startswith('Y') or ans == '':
-      return True
+    if len(self.rename_pairs) > 0:
+      msg_for_input = 'Confirm renames above with %d files and %d ids? (Y*/n) ' %(len(self.rename_pairs), len(self.ytids))
+      ans = input(msg_for_input)
+      if ans.startswith('y') or ans.startswith('Y') or ans == '':
+        return True
     return False
 
   def doRenames(self):
