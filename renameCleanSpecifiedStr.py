@@ -69,7 +69,7 @@ class Renamer:
     print ("Folder =>", self.abspath)
     print ("Replace str =>", self.specified_str)
     for i, target_filename in enumerate(self.target_filenames):
-      if target_filename.find(self.specified_str):
+      if target_filename.find(self.specified_str) > -1:
         newname = target_filename.replace(self.specified_str, '')
         if os.path.isfile(newname):
           continue
@@ -88,10 +88,11 @@ class Renamer:
       self.confirm_rename = False
       return
 
-    ans = input('Rename them (y/N) ? ')
+    self.confirm_rename = True
+    ans = input('Rename them (Y/n) ? ')
     # self.confirm_rename = False
-    if ans in ['y', 'Y']:
-      self.confirm_rename = True
+    if ans in ['n', 'N']:
+      self.confirm_rename = False
 
   def do_rename(self):
     '''
