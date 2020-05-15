@@ -7,14 +7,15 @@ import os.path
 import glob
 import os
 import sys
-import BeautifulSoup as bs
+# import BeautifulSoup as bs
+import bs4 as bs
 
 commBase = 'ffmpeg -i "%(mediaFile)s" -vcodec libx264 "%(mp4)s"'
 EXTENSIONS_DEFAULT = ['flv', 'm4v', 'mov']
 
 def getWeblinksAsATags(htmlFile):
   text = open(htmlFile).read()
-  bSoup = bs.BeautifulSoup(text)
+  bSoup = bs.BeautifulSoup(text, feature='lxml')
   aTags = bSoup.findAll('a')
   return aTags
 
@@ -40,3 +41,4 @@ def main():
 
 if __name__ == '__main__':
   main()
+
