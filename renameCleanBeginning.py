@@ -1,10 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import glob, os, string, sys #, shutil, sys
 
 def print_explanation_and_exit():
-  print 'Arguments to the script:'
-  print '-e=<file-extension> (optional)'
-  print '-p=<integer-string-index-position> (required)'
+  print ('Arguments to the script:')
+  print ('-e=<file-extension> (optional)')
+  print ('-p=<integer-string-index-position> (required)')
   sys.exit(0)
 
 # args = ['-p=', '-e=']
@@ -39,8 +39,8 @@ def rename(args):
       name, ext = os.path.splitext(fil)
       # print 'name, ext', name, ext
       tamNameWithoutExt = len(name)
-      if ext <> None:
-        if ext <> args.get_ext_with_period():
+      if ext != None:
+        if ext != args.get_ext_with_period():
           continue
       if posFrom >= tamNameWithoutExt:
         continue
@@ -48,15 +48,15 @@ def rename(args):
         continue
       newName = fil[posFrom:]
       c += 1
-      print c, 'renaming', fil
-      print '> to:>>>'+newName
+      print (c, 'renaming', fil)
+      print ('> to:>>>'+newName)
       if i==1:
         os.rename(fil, newName)
     if c==0:
-      print 'No files are sized above position', posFrom
+      print ('No files are sized above position', posFrom)
       break
     if i==0 and c > 0:
-      ans = raw_input('Are you sure? (y/n) ')
+      ans = input('Are you sure? (y/n) ') # raw_input
       if ans != 'y':
         break
 
