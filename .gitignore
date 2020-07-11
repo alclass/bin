@@ -4,6 +4,9 @@ bin_local_settings.py
 .pydevproject
 .settings
 .vscode/
+alembic
+kindlegen
+slugify
 oscillator
 pyidle
 source-ifort-path

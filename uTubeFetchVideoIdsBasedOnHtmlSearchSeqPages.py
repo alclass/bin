@@ -1,104 +1,72 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+#!/usr/bin/python3
 '''
-This script has two functionalities:
+Usage:
+<this_script> [-f=<youtube_videos_filename>]
 
-  1) when used without arguments, it reads an html YouTube page and outputs
-    a file named youtube-ids.txt
-    Obs: youtube-ids.txt is input for a second script that reuses youtube-dl and
-        download the youtube videos by their id's, one at a time.
-  Eg. $uTubeFetchVideoIdsBasedOnHtmlSearchSeqPages.py
-
-  2) when used with a sole argument, this argument is
-    a filename on the current directory that has, on each line, filenames that
-    adhere to the convention of a dash and the 11-char ytid, ending with a dot and extension.
-  Eg. $uTubeFetchVideoIdsBasedOnHtmlSearchSeqPages.py z-filenames.txt
-  If a non-existing filename is used, the script will fall back to
-    the default filename which is [[z-filenames.txt]].
-
-  3) when used with either -h or --help arguments, this script will print out
-    this docpage.
+  Parameters:
+    -- help => this message
+    -f=<filename> => where <filename> is for a videos page
+                  if no videos filename is given, default is named 'a - YouTube 01.html',
+                  ie, there should be a videos file on current folder with that name.
+    Internally, the script is also able to read full OS filepath,
+    but in that case it should be called from another program, prepared to join a path a call the entry function here.
 '''
-import glob, os, sys
-import local_settings as bls
-sys.path.insert(0, os.path.abspath(bls.UTUBEAPP_PATH))
-import uTubeOurApps.shellclients.uTubeFetchVideoIdsBasedOnHtmlSearchSeqPages as ytvidsFetcher
-import uTubeOurApps.shellclients.uTubeExtractIdsFromFilenames as ytIdsExtractor
+import os, sys
 
-FILENAMES_WITH_YTIDS__DEFAULT_FILENAME = 'z-filenames.txt'
-class Arg:
+localfolder = False
+prefixBegStr = '{"videoId":"'
+posfixEndStr = '"'
 
-  def __init__(self):
-    self.filenames_filename = None
-    self.get_args()
+def extract_videoids(text):
+  begpos = text.find(prefixBegStr)
+  ytvideoids = []
+  while begpos > -1:
+    forwardpos = begpos + len(prefixBegStr)
+    text = text[ forwardpos : ]
+    endpos = text.find(posfixEndStr)
+    if endpos > -1:
+      ytvideoid = text [ : endpos ]
+      ytvideoids.append(ytvideoid)
+    text = text [ endpos + 1 : ]
+    begpos = text.find(prefixBegStr)
+  total_before_uniq = len(ytvideoids)
+  ytvideoids = list(set(ytvideoids))
+  for ytvideoid in ytvideoids:
+    print(ytvideoid)
+  total_uniq = len(ytvideoids)
+  return total_uniq, total_before_uniq
 
-  def get_filenames_filename(self):
-    if self.filenames_filename is None or self.filenames_filename == '' or type(self.filenames_filename)!=str:
-      return FILENAMES_WITH_YTIDS__DEFAULT_FILENAME
-    return self.filenames_filename
+DEFAULT_FILENAME = 'a - YouTube 01.html'
+dirpath = "/media/friend/SAMSUNG/z Tmp/YT videos tmp/Soc Sci tmp ytvideos/L Human Languages ytvideos/French Learning ytvideos/GF 100-v n' yyyy Grammaire Française yu Sulex Shana ytpl/"
+def make_filepath(infilename=None, dirpath=None):
+  if infilename is None:
+    filename = DEFAULT_FILENAME
+  else:
+    filename = infilename
+  if localfolder or dirpath is None:
+    return filename
+  filepath = os.path.join(dirpath, filename)
+  return filepath
 
-  def get_filenames_filepath(self):
-    folderpath = os.getcwd()
-    filepath = os.path.join(folderpath, self.get_filenames_filename())
-    return filepath
+def go_extract(infilename=None, dirpath=None):
+  filepath = make_filepath()
+  text = open(filepath, 'r', encoding='utf8').read()
+  _ = extract_videoids(text)
 
-  # self.filenames_filename = FILENAMES_WITH_YTIDS__DEFAULT_FILENAME
-
-  def verify_n_set_filepath(self):
-    '''
-      # folderpath = os.path.dirname(os.path.realpath(__file__))
-      # folderpath = os.path.dirname(sys.argv[0])
-
-    error_msg = 'self.filenames_filename ("%s") is missing.' % self.filenames_filename
-    error_msg += '\n'
-    folderpath = os.getcwd()
-
-    :return:
-    '''
-    filepath = self.get_filenames_filepath()
-    if not os.path.isfile(filepath):
-      if self.filenames_filename != FILENAMES_WITH_YTIDS__DEFAULT_FILENAME:
-        self.filenames_filename = FILENAMES_WITH_YTIDS__DEFAULT_FILENAME
-        filepath = self.get_filenames_filepath()
-        if not os.path.isfile(filepath):
-          error_msg = '''
-   The following filepath:
-   -----------------------------------------------
-   %s
-   -----------------------------------------------
-   does not exist. (Type -h or --help for printing out the script's docpage.)
-''' %filepath
-          raise IOError(error_msg)
-
-  def get_args(self):
-    for arg in sys.argv[1:]:
-      if arg == '-h' or arg == '--help':
-        print __doc__
-        sys.exit(0)
-      elif arg.startswith('-'):
-        continue
-      else:
-        self.filenames_filename = arg
-        self.verify_n_set_filepath()
-
-# 1st functionality
-def extract_ytids_from_html():
-  ytvidsFetcher.process()
-
-# 2nd functionality
-def extract_ytids_from_filenames_filename(filenames_filepath):
-  ytids = ytIdsExtractor.extract_ytids_from_filenames(filenames_filepath)
-  for ytid in ytids:
-    print ytid
+def get_args():
+  for arg in sys.argv:
+    if arg.startswith('-f='):
+      infilename = arg[ len('-f=') : ]
+      infilename = infilename.lstrip('"').rstrip('"')
+      return infilename
+    elif arg.startswith('--help'):
+      print (__doc__)
+      sys.exit()
+  return None
 
 def process():
-  arg_obj = Arg()
-  if arg_obj.filenames_filename is None:
-    extract_ytids_from_html()
-  else:
-    filenames_filepath = arg_obj.get_filenames_filepath()
-    # print ('filenames_filepath', filenames_filepath)
-    extract_ytids_from_filenames_filename(filenames_filepath)
+  go_extract(get_args())
 
 if __name__ == '__main__':
+  localfolder = True
   process()
