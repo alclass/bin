@@ -12,11 +12,18 @@ Usage:
     but in that case it should be called from another program, prepared to join a path a call the entry function here.
 '''
 import os, sys
+import collections as coll
 
 localfolder = False
 prefixBegStr = '{"videoId":"'
 posfixEndStr = '"'
 
+def uniquesize(alist):
+  od = coll.OrderedDict()
+  for e in alist:
+    od[e]=1
+  return list(od.keys())
+  
 def extract_videoids(text):
   begpos = text.find(prefixBegStr)
   ytvideoids = []
@@ -30,7 +37,8 @@ def extract_videoids(text):
     text = text [ endpos + 1 : ]
     begpos = text.find(prefixBegStr)
   total_before_uniq = len(ytvideoids)
-  ytvideoids = list(set(ytvideoids))
+  # ytvideoids = list(set(ytvideoids))
+  ytvideoids = uniquesize(ytvideoids)
   for ytvideoid in ytvideoids:
     print(ytvideoid)
   total_uniq = len(ytvideoids)
