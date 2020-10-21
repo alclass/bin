@@ -28,7 +28,7 @@ class Renamer:
   '''
   class Renamer:
   '''
-  def __init__(self, specified_str, no_confirm=False, extension=None, abspath=None):
+  def __init__(self, specified_str, extension=None, abspath=None, no_confirm=False):
     '''
 
     :param specified_str:
@@ -122,22 +122,24 @@ class Renamer:
 
 def get_str_arg():
   specified_str = None
+  ext = None
   for arg in sys.argv:
     if arg.startswith('--help'):
       print(__doc__)
       sys.exit(0)
     elif arg.startswith('-s='):
       specified_str = arg[ len('-s=') : ]
-      break
+    elif arg.startswith('-e='):
+      ext = arg[ len('-e=') : ]
   if specified_str is None:
     print (__doc__)
     error_msg = 'specified_str is missing. Program cannot continue.'
     raise ValueError(error_msg)
-  return specified_str
+  return specified_str, ext
 
 def process():
-  specified_str = get_str_arg()
-  Renamer(specified_str)
+  specified_str, extension = get_str_arg()
+  Renamer(specified_str, extension)
 
 if __name__ == '__main__':
   process()
