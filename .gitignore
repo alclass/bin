@@ -4,6 +4,7 @@ bin_local_settings.py
 .pydevproject
 .settings
 .vscode/
+venv/
 alembic
 kindlegen
 slugify
