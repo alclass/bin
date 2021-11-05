@@ -23,6 +23,7 @@ class Renamer:
     """
     self.start_number = start_number
     self.rename_pairs = []
+    self.zfillsize = None
     self.process_rename()
 
   def prep_rename(self):
@@ -32,13 +33,13 @@ class Renamer:
     files = os.listdir('.')
     sorted(files)
     total_files = len(files)
-    zfillsize = len(str(total_files))
+    self.zfillsize = len(str(total_files))
     fileseq = self.start_number
     for i, filename in enumerate(files):
-      new_filename = str(fileseq).zfill(zfillsize) + ' ' + filename
+      new_filename = str(fileseq).zfill(self.zfillsize) + ' ' + filename
       seq = i + 1
-      print(str(seq).zfill(zfillsize), 'Renaming: [' + filename + ']')
-      print(str(seq).zfill(zfillsize), '>>>   To: [' + new_filename + ']')
+      print(str(seq).zfill(self.zfillsize), 'Renaming: [' + filename + ']')
+      print(str(seq).zfill(self.zfillsize), '>>>   To: [' + new_filename + ']')
       pair = (filename, new_filename)
       self.rename_pairs.append(pair)
       fileseq += 1
@@ -69,8 +70,8 @@ class Renamer:
       if os.path.isfile(new_filename):
         print(seq, 'File [%s] already exists.')
         continue
-      print(str(seq).zfill(zfillsize), 'Renaming: [' + filename + ']')
-      print(str(seq).zfill(zfillsize), '>>>   To: [' + new_filename + ']')
+      print(str(seq).zfill(self.zfillsize), 'Renaming: [' + filename + ']')
+      print(str(seq).zfill(self.zfillsize), '>>>   To: [' + new_filename + ']')
       os.rename(filename, new_filename)
       n_renames += 1
       print ('n_renames = ', n_renames)

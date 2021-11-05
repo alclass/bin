@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+'''
+This script renames srt-files copying the extensionless filenames in a folder.
+Important Restriction for the time being:
+  1) this script is not (right now) outside local folder (where it's run);
+  2) the script is prepared, with its upgrade, for run with a given parameter folder.
+'''
 import glob, os
 
 DEFAULT_SUBTITLE_EXT = '.srt'
@@ -22,10 +28,9 @@ class Rename:
 
   def set_workfolder_absdir(self, workfolder_absdir):
     if self.workfolder_absdir is None:
-      self.workfolder_absdir = os.path.
-
-
-
+      self.workfolder_absdir = os.path.abspath('.')
+    else:
+      self.workfolder_absdir = workfolder_absdir
 
   def rename_process(self):
     '''
@@ -91,9 +96,9 @@ class Rename:
     if self.no_confirm:
       self.confirm_rename = True
 
-    ans = input('Rename them (y/N) ? ')
+    ans = input('Rename them (*Y/n) ? ')
     self.confirm_rename = False
-    if ans in ['y', 'Y']:
+    if ans in ['y', 'Y', '']:
       self.confirm_rename = True
 
   def do_rename(self):
@@ -124,6 +129,7 @@ class Rename:
     print ('Number of rename pairs:', len(self.rename_pairs))
     print ('Number of renamed:', self.n_renames)
 
+
 def walkup_folders():
   entries = os.listdir('.')
   for entry in entries:
@@ -132,12 +138,9 @@ def walkup_folders():
       workfolder_absdir = os.path.join(absdir, entry)
 
 
-
-
-
-
 def process():
   Rename()
+
 
 if __name__ == '__main__':
   process()
