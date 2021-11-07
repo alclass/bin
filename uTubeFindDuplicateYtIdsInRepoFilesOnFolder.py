@@ -17,6 +17,34 @@ ENCODE64CHARS = string.digits + string.ascii_uppercase + string.ascii_lowercase 
 ACCEPTABLE_EXTENSIONS = ['.mp3', '.mp4', 'webm']
 
 
+def add_to_countingdict(pkey, pdict):
+  if pkey in pdict:
+    count = pdict[pkey]
+    pdict[pkey] = count + 1
+  else:
+    pdict[pkey] = 2  # because it's caught from the 2nd occorence onwards
+
+
+def add_to_strlistdict(pkey, strtolist, pdict):
+  if pkey in pdict:
+    strlist = pdict[pkey]
+    strlist.append(strtolist)
+  else:
+    pdict[pkey] = [strtolist]
+
+
+def find_a_possible_ytid_from_name(name):
+  try:
+    supposed_ytid_with_dash = name[-12:]
+    if supposed_ytid_with_dash[0] != '-':
+      return None
+    supposed_ytid = supposed_ytid_with_dash[1:]
+    return return_encode64_or_none(supposed_ytid)
+  except IndexError:
+    pass
+  return None
+
+
 def return_encode64_or_none(supposed_ytid):
   if supposed_ytid is None:
     # hypothesis 1 -> paramvalue is None itself
@@ -65,18 +93,23 @@ def find_ytid_in_line(line):
     return None
   if len(name) < 12:
     return None
-  supposed_ytid = name[-11:]
-  ytid = return_encode64_or_none(supposed_ytid)
+  ytid = find_a_possible_ytid_from_name(name)
   return ytid
 
 
 class RepoFilesReader:
+  """
+  Because of possible memory large use, the ytid's will be looked up throughout TWO pass, ie:
+  1) the 1st pass is just to filter out the ytid's that repeat.
+  2) the 2nd pass will tabulate them ordered by ytid's themselves (instead of order of appearance)
+  """
 
   def __init__(self):
-    self.repeat_counter = 0
-    self.ytid_dict = {}
-    self.ytids = []
-    self.repeat_ytids = []
+    self.REPEATS_OUTPUT_FILENAME = 'z-results-ytid-repeats.txt'
+    self.ytids_repeat_dict = {}
+    self.ytids_paths_dict = {}
+    self.ytids_found = []
+    self.outfile = None
 
   @staticmethod
   def find_repofiles_on_folder():
@@ -84,33 +117,118 @@ class RepoFilesReader:
     repofiles = filter(lambda n: n.startswith(FILEPREFIX), files)
     return repofiles
 
-  def find_repeat_ytids_in_file(self, repofile):
-    print('reading', repofile)
+  def write_to_repeat_ytid_file(self, ytid, filename, previouspath):
+    if self.outfile is None:
+      outfilename = 'z-results-ytid-repeats.txt'
+      self.outfile = open(outfilename, 'w', encoding='utf8')
+    filepath = os.path.join(previouspath, filename)
+    outline = ytid + ' | ' + filepath + '\n'
+    self.n_repeat_ytids += 1
+    self.outfile.write(outline)
+
+  def save_resultsfile_with_ytids_n_paths(self):
+    outfile = open(self.REPEATS_OUTPUT_FILENAME, 'w', encoding='utf8')
+    print('Writing to file', self.REPEATS_OUTPUT_FILENAME)
+    n_lines = 0
+    for ytid in self.ytids_paths_dict:
+      strlist = self.ytids_paths_dict[ytid]
+      for path in strlist:
+        outline = path
+        outline = outline.rstrip(' \t\r\n') + '\n'  # only one \n should go with line
+        n_lines += 1
+        outfile.write(outline)
+    print('Closing file', self.REPEATS_OUTPUT_FILENAME, 'with', n_lines)
+    outfile.close()
+
+  def treat_ytid_in_the_2nd_pass(self, ytid, lineasfilename, previouspath):
+    if ytid not in self.ytids_repeat_dict:
+      return
+    lineasfilename = lineasfilename.lstrip(' \t').lstrip(' \t\r\n')
+    filepath = os.path.join(previouspath, lineasfilename)
+    add_to_strlistdict(ytid, filepath, self.ytids_paths_dict)
+
+  def run_2nd_pass(self, repofile):
+    print('Reading 2nd pass', repofile)
+    repofd = open(repofile)
+    line = repofd.readline()
+    previouspath = None
+    while line:
+      if line.startswith('./'):
+        previouspath = line.rstrip(' \t\r\n')
+        previouspath = previouspath.rstrip(':')
+      elif len(line) < 17:  # 11 (ytid) + 1 (dash) + 5|4 (.webm | .mp4) + 2|1 (short filename) = 19|17
+        pass
+      else:
+        ytid = self.extract_ytid_from_line_as_filename(line)
+        self.treat_ytid_in_the_2nd_pass(ytid, line, previouspath)
+      # reads next line and loop
+      line = repofd.readline()
+    repofd.close()
+
+  @staticmethod
+  def extract_ytid_from_line_as_filename(line):
+    filename = line.lstrip(' \t').rstrip(' \t\r\n')
+    name, ext = os.path.splitext(filename)
+    if ext not in ACCEPTABLE_EXTENSIONS:
+      return None
+    try:
+      ytid = find_a_possible_ytid_from_name(name)
+      return ytid
+    except IndexError:
+      pass
+    return None
+
+  def print_histogram_ytid_repeats(self):
+    for ytid in self.ytids_repeat_dict:
+      print(ytid, ' | ', self.ytids_repeat_dict[ytid])
+    print('Total:', len(self.ytids_repeat_dict))
+
+  def treat_ytid_in_the_1st_pass(self, ytid):
+    if ytid is None:
+      return
+    if ytid not in self.ytids_found:
+      self.ytids_found.append(ytid)
+    else:
+      add_to_countingdict(ytid, self.ytids_repeat_dict)
+      # self.write_to_repeat_ytid_file(ytid, filename, previouspath)
+
+  def run_1st_pass(self, repofile):
+    """
+    The 1st pass discovers ytid's that repeat and, later in the 2nd pass, writes them with its paths in order
+    Details for deleting a large list at the end of the 1st run:
+      1) list self.ytids_found helps organize the self.ytids_repeat_dict in the first run
+      2) at the end of the 1st run, this list may be safely deleted to save some memory
+         (the garbage collector run is not guaranteed)
+
+    :return:
+    """
+    print('Reading 1st pass', repofile)
     repofd = open(repofile)
     line = repofd.readline()
     while line:
-      # print(line)
-      ytid = find_ytid_in_line(line)
-      if ytid is not None:
-        if ytid in self.ytids:
-          if 'z Extra/' in line:
-            pass
-          else:
-            self.repeat_counter += 1
-            self.repeat_ytids.append(ytid)
-            # print(line)
-        else:
-          self.ytids.append(ytid)
+      if line.startswith('./'):
+        pass
+      elif len(line) < 17:  # 11 (ytid) + 1 (dash) + 5|4 (.webm | .mp4) + 2|1 (short filename) = 19|17
+        pass
+      else:
+        ytid = self.extract_ytid_from_line_as_filename(line)
+        self.treat_ytid_in_the_1st_pass(ytid)
+      # reads next line and loop
       line = repofd.readline()
+    # the ytids_found is a large list, deleting it will help save some memory
+    del self.ytids_found
+    repofd.close()
+
+  def process_repofile(self, repofile):
+    self.run_1st_pass(repofile)
+    # self.print_histogram_ytid_repeats()
+    self.run_2nd_pass(repofile)
+    self.save_resultsfile_with_ytids_n_paths()
 
   def process(self):
     repofiles = self.find_repofiles_on_folder()
     for repofile in repofiles:
-      self.find_repeat_ytids_in_file(repofile)
-    print('number of unique ytids =>', len(self.ytids))
-    for ytid in self.repeat_ytids:
-      print('repeat ytid', ytid)
-    print('repeat_counter =>', self.repeat_counter)
+      self.process_repofile(repofile)
 
 
 def adhoc_test1():
@@ -220,7 +338,20 @@ class YtIdsTest(unittest.TestCase):
     returned_ytid = return_encode64_or_none(extracted_ytid_from_line)
     self.assertEqual(extracted_ytid_from_line, returned_ytid)
 
-  def test7_find_a_ytid_in_a_line(self):
+  def test7_find_a_ytid_in_a_line_2ndway(self):
+    name = "2020-11-18 21' Exploring The Human-Ape Paradox \
+    - Iain Davidson - Art, Story, Mind-nDrtXuw0ubQ"
+    should_found_ytid = 'nDrtXuw0ubQ'
+    extracted_ytid_from_name = find_a_possible_ytid_from_name(name)
+    self.assertEqual(extracted_ytid_from_name, should_found_ytid)
+    # the 2nd test here changes the '-' before ytid to an equal sign (=) - case in which ytid returns as None
+    name = "2020-11-18 21' Exploring The Human-Ape Paradox \
+    - Iain Davidson - Art, Story, Mind=nDrtXuw0ubQ"  # notice the missing '-' (changed to '=' here)_
+    # should_found_ytid = 'nDrtXuw0ubQ'
+    extracted_ytid_from_name = find_a_possible_ytid_from_name(name)
+    self.assertIsNone(extracted_ytid_from_name)
+
+  def test8_find_a_ytid_in_a_line(self):
     line = "    2020-11-18 21' Exploring The Human-Ape Paradox \
     - Iain Davidson - Art, Story, Mind-nDrtXuw0ubQ.mp4          "
     line = line.lstrip(' \t').rstrip(' \t\r\n')
@@ -239,3 +370,27 @@ class YtIdsTest(unittest.TestCase):
     self.assertFalse(returned_bool)
     expected_name = 'blah'
     self.assertEqual(expected_name, name)
+
+  def test9_add_to_countingdict(self):
+    pdict = {}
+    pkey = 'anykey'
+    add_to_countingdict(pkey, pdict)
+    self.assertEqual(pdict, {'anykey': 2})
+    add_to_countingdict(pkey, pdict)
+    self.assertEqual(pdict, {'anykey': 3})
+    pkey = '2ndkey'
+    add_to_countingdict(pkey, pdict)
+    self.assertEqual(pdict, {'anykey': 3, '2ndkey': 2})
+
+  def test10_add_to_strlistdict(self):
+    pdict = {}
+    pkey = 'anykey'
+    ppath = '/path/to/file1'
+    expected_list = [ppath]
+    add_to_strlistdict(pkey, ppath, pdict)
+    expected_dict = {'anykey': expected_list}
+    self.assertEqual(pdict, expected_dict)
+    ppath = '/path/to/file2'
+    expected_list.append(ppath)
+    add_to_strlistdict(pkey, ppath, pdict)
+    self.assertEqual(pdict, expected_dict)
