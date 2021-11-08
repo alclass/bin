@@ -97,6 +97,40 @@ def find_ytid_in_line(line):
   return ytid
 
 
+class AjustFolderPath:
+
+  default_baseworkpath = '/media/friend/CompSci 2T Orig'
+  workpath = None
+  _instance = None
+
+  def __init__(self, workpath=None):
+    if workpath is None:
+      self.workpath = self.default_baseworkpath
+    else:
+      self.workpath = workpath
+    if not os.path.isdir(self.workpath):
+      error_msg = 'Working Directory ' + self.workpath + 'does not exist. Program cannot continue.'
+      raise OSError(error_msg)
+    self._instance = self
+
+  @classmethod
+  def get_workpath(cls):
+    if cls._instance is None:
+      cls._instance = cls()
+    cls.workpath = cls._instance.workpath
+    return cls.workpath
+
+  @classmethod
+  def set_workpath(cls, workpath):
+    if not os.path.isdir(workpath):
+      error_msg = 'Working Directory ' + workpath + 'does not exist. Program cannot continue.'
+      raise OSError(error_msg)
+    cls.workpath = workpath
+    if cls._instance is None:
+      cls._instance = cls()
+      cls._instance.workpath = cls.workpath = workpath
+
+
 class RepoFilesReader:
   """
   Because of possible memory large use, the ytid's will be looked up throughout TWO pass, ie:
@@ -104,17 +138,28 @@ class RepoFilesReader:
   2) the 2nd pass will tabulate them ordered by ytid's themselves (instead of order of appearance)
   """
 
+  REPEATS_OUTPUT_FILENAME = 'z-results-ytid-repeats.txt'
+
   def __init__(self):
-    self.REPEATS_OUTPUT_FILENAME = 'z-results-ytid-repeats.txt'
+    self.REPEATS_OUTPUT_FILEPATH = None
+    self.set_repeats_output_filepath()
     self.ytids_repeat_dict = {}
     self.ytids_paths_dict = {}
     self.ytids_found = []
     self.outfile = None
 
+  def set_repeats_output_filepath(self):
+    workdirpath = AjustFolderPath.get_workpath()
+    self.REPEATS_OUTPUT_FILEPATH = os.path.join(workdirpath, self.REPEATS_OUTPUT_FILENAME)
+
   @staticmethod
   def find_repofiles_on_folder():
-    files = os.listdir('.')
-    repofiles = filter(lambda n: n.startswith(FILEPREFIX), files)
+    workdirpath = AjustFolderPath.get_workpath()
+    files = os.listdir(workdirpath)
+    repofilenames = filter(lambda n: n.startswith(FILEPREFIX), files)
+    repofiles = []
+    for fn in repofilenames:
+      repofiles.append(os.path.join(workdirpath, fn))
     return repofiles
 
   def write_to_repeat_ytid_file(self, ytid, filename, previouspath):
@@ -127,7 +172,8 @@ class RepoFilesReader:
     self.outfile.write(outline)
 
   def save_resultsfile_with_ytids_n_paths(self):
-    outfile = open(self.REPEATS_OUTPUT_FILENAME, 'w', encoding='utf8')
+    filepath = os.path.join(AjustFolderPath.get_workpath(), self.REPEATS_OUTPUT_FILENAME)
+    outfile = open(filepath, 'w', encoding='utf8')
     print('Writing to file', self.REPEATS_OUTPUT_FILENAME)
     n_lines = 0
     for ytid in self.ytids_paths_dict:
@@ -146,6 +192,35 @@ class RepoFilesReader:
     lineasfilename = lineasfilename.lstrip(' \t').lstrip(' \t\r\n')
     filepath = os.path.join(previouspath, lineasfilename)
     add_to_strlistdict(ytid, filepath, self.ytids_paths_dict)
+
+  def run_3rd_pass_interactive_del(self):
+    n_deleted = 0
+    for ytid in self.ytids_paths_dict:
+      print('='*50)
+      print(ytid)
+      print('='*50)
+      for i, fpath in enumerate(self.ytids_paths_dict[ytid]):
+        print(i+1, '=>', fpath)
+        print('='*50)
+      # num_to_keep = input('Type the number above to keep ? (0 for next without deletion) ')
+      # num_to_keep = int(num_to_keep)
+      num_to_keep = 1
+      if num_to_keep == 0:
+        pass
+        # continue
+      idx_to_keep = num_to_keep - 1
+      for i, fpath in enumerate(self.ytids_paths_dict[ytid]):
+        if idx_to_keep == i:
+          continue
+        fpath = fpath.lstrip('./').rstrip('\n')
+        fpath_to_delete = os.path.join(AjustFolderPath.get_workpath(), fpath)
+        try:
+          os.remove(fpath_to_delete)
+          n_deleted += 1
+          print(n_deleted, 'Deleted ', fpath_to_delete)
+        except FileNotFoundError:
+          pass
+      print('n_deleted', n_deleted)
 
   def run_2nd_pass(self, repofile):
     print('Reading 2nd pass', repofile)
@@ -215,15 +290,16 @@ class RepoFilesReader:
         self.treat_ytid_in_the_1st_pass(ytid)
       # reads next line and loop
       line = repofd.readline()
-    # the ytids_found is a large list, deleting it will help save some memory
-    del self.ytids_found
     repofd.close()
+    # the ytids_found is a large list, to save some memory, reattribute [] (empty list) to it
+    self.ytids_found = []
 
   def process_repofile(self, repofile):
     self.run_1st_pass(repofile)
     # self.print_histogram_ytid_repeats()
     self.run_2nd_pass(repofile)
     self.save_resultsfile_with_ytids_n_paths()
+    # self.run_3rd_pass_interactive_del()
 
   def process(self):
     repofiles = self.find_repofiles_on_folder()
