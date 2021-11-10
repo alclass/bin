@@ -6,8 +6,10 @@
 import sys
 import local_settings as ls # local Python (bin) settings
 sys.path.insert(0, ls.UTUBEAPP_PATH)
-from shellclients.dlYouTubeWithIdsOnTxtFile import VideoidsGrabberAndDownloader
-#import uTubeOurApps.shellclients.dlYouTubeWithIdsOnTxtFile.VideoidsGrabberAndDownloader as VideoidsGrabberAndDownloader
+#from shellclients.dlYouTubeWithIdsOnTxtFile import VideoidsGrabberAndDownloader
+# import uTubeOurApps.shellclients.dlYouTubeWithIdsOnTxtFile.VideoidsGrabberAndDownloader as VideoidsGrabberAndDownloader
+from uTubeOurApps.shellclients.dlYouTubeWithIdsOnTxtFile import VideoidsGrabberAndDownloader
+
 
 def process():
   youtubeids_filename = None
