@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 '''
 This script belongs to the 'rename' prefix Python group of scripts located in the user's bin folder (or, in fact, anywhere).
 It does a particular kind of file renaming, which is the following:
