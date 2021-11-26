@@ -25,8 +25,8 @@ import sys
 import time
 import string
 
-import  bin_local_settings as bls
-sys.path.insert(0, bls.PyMirrorFileSystemsByHash_PATH) # the PATH to this lib is placed (configured) in bin_local_settings.py
+import  installed_apps_dirs as bls
+sys.path.insert(0, bls.PyMirrorFileSystemsByHash_PATH) # the PATH to this lib is placed (configured) in installed_apps_dirs.py
 import Sha1FileSystemComplementer as fsComplementorMod
 
 def walk_on_up_tree_to_grab_sha1hex(DEVICE_ROOT_ABSPATH, FURTHER_ABOVE_ON_DEVICE_PATH=None):
