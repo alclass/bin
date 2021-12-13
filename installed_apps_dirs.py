@@ -1,1 +1,1 @@
-UTUBEAPP_PATH='/home/dados/Sw3/SwInst/PySwInst/uTubeOurApps'
+UTUBEAPP_PATH = '/home/dados/Sw3/SwInst/PySwInst'
