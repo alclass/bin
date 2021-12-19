@@ -97,7 +97,7 @@ class Renamer:
 
 
 def get_args():
-  args = {'ext': None, 'piece1': '', 'piece2': '', 'noconfirm': True, 'dodirwalk': False}
+  args = {'ext': None, 'piece1': '', 'piece2': '', 'noconfirm': False, 'dodirwalk': False}
   for arg in sys.argv:
     if arg.startswith('-h') or arg.startswith('--help'):
       print(__doc__)
@@ -149,7 +149,7 @@ def adhoc_test():
 def process():
   args = get_args()
   ext, piece1, piece2, noconfirm, dodirwalk = \
-    args['ext'], args['piece1'], args['piece2'], args['noconfirm'], args['dodirwalk']
+      args['ext'], args['piece1'], args['piece2'], args['noconfirm'], args['dodirwalk']
   if dodirwalk:
     process_dir_walk(ext, piece1, piece2, noconfirm)
   else:
