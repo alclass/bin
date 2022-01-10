@@ -14,6 +14,7 @@ Obs:
     (it may be changed in the future to make it more flexible, ie to make it able to be run from any location);
   2) when not using an extension parameter, files and directories will be renamed.
 """
+import glob
 import os
 import sys  # shutil, sys
 
@@ -27,14 +28,22 @@ class Renamer:
   def __init__(self, prefix, extension):
     self.prefix = prefix
     self.extension = extension
+    self.treat_extension()
     self.rename_pairs = []
     self.process_renames()
+
+  def treat_extension(self):
+    if self.extension is None:
+      return
+    self.extension = self.extension.lstrip('.')
+    if len(self.extension) == 0:
+      self.extension = None
 
   def prep_renames(self):
     if self.extension is None:
       files = os.listdir('.')
     else:
-      files = os.listdir('.' + self.extension)
+      files = glob.glob('*.' + self.extension)
     if len(files) == 0:
       print('No files to rename.')
       return
