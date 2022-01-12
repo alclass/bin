@@ -25,12 +25,13 @@ class Renamer:
     Take a look at method process() to observe the pieces in the job-chain.
   """
 
-  def __init__(self, prefix, extension):
+  def __init__(self, prefix, extension, autorename_without_confirmation=False):
     self.prefix = prefix
     self.extension = extension
     self.treat_extension()
     self.rename_pairs = []
-    self.process_renames()
+    self.autorename_without_confirmation = autorename_without_confirmation
+    # self.process_renames()
 
   def treat_extension(self):
     if self.extension is None:
@@ -90,8 +91,11 @@ class Renamer:
 
   def process_renames(self):
     self.prep_renames()
-    if self.confirm_renames():
-        self.do_renames()
+    if self.autorename_without_confirmation:
+      self.do_renames()
+    else:
+      if self.confirm_renames():
+          self.do_renames()
 
 
 def get_prefix_n_extension_arg():
@@ -100,6 +104,7 @@ def get_prefix_n_extension_arg():
   :return prefix, extension:
   """
   extension = None
+  autorename_without_confirmation = False
   if len(sys.argv) < 2:
     print(__doc__)
     sys.exit(0)
@@ -108,12 +113,15 @@ def get_prefix_n_extension_arg():
     for arg in sys.argv[2:]:
       if arg.startswith('-e='):
         extension = arg[len('-e='):]
-  return prefix, extension
+      elif arg == '-y':
+        autorename_without_confirmation = True
+  return prefix, extension, autorename_without_confirmation
 
 
 def process():
-  prefix, extension = get_prefix_n_extension_arg()
-  Renamer(prefix, extension)
+  prefix, extension, autorename_without_confirmation = get_prefix_n_extension_arg()
+  renamer = Renamer(prefix, extension, autorename_without_confirmation)
+  renamer.process_renames()
 
 
 if __name__ == '__main__':
