@@ -69,6 +69,12 @@ def has_at_least_one_uppercase_letter(supposed_ytid):
 
 
 def extract_ytid_from_a_filename_line_as_expected(filename):
+  """
+  if not has_at_least_one_lowercase_letter(supposed_ytid):
+    return None
+  if not has_at_least_one_uppercase_letter(supposed_ytid):
+    return None
+  """
   name, ext = os.path.splitext(filename)
   try:
     if name[-12] != '-':
@@ -78,12 +84,7 @@ def extract_ytid_from_a_filename_line_as_expected(filename):
   supposed_ytid = name[-11: ]
   if not check_str_is_encoding64(supposed_ytid):
     return None
-  if not has_at_least_one_lowercase_letter(supposed_ytid):
-    return None
-  if not has_at_least_one_uppercase_letter(supposed_ytid):
-    return None
-  return name[-11: ]
-
+  return supposed_ytid
 
 
 def extract_ytids_from_input_file():
@@ -93,7 +94,7 @@ def extract_ytids_from_input_file():
   while line:
     ytid = extract_ytid_from_a_filename_line_as_expected(line)
     if ytid is None:
-      return
+      continue
     print (ytid)
     line = fd.readline()
 
