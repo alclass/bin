@@ -129,7 +129,7 @@ class Renamer:
 
 def get_str_arg():
   specified_str = None
-  autorename_without_confirmation = True
+  autorename_without_confirmation = False
   ext = None
   for arg in sys.argv:
     if arg.startswith('--help'):
