@@ -22,7 +22,7 @@ def runCurrentFolder(doRename=False):
 
 def processRename():
   '''
-  processRename()
+  process_rename()
   '''
   runCurrentFolder(doRename=False)
   print ' *** QUESTION *** '

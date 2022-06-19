@@ -69,6 +69,7 @@ class PageTotalPdfRenamer:
     total_pdfs = len(self.pdfs)
     for i, pdf_filename in enumerate(self.pdfs):
       seq = i + 1
+      print(seq, '=>', pdf_filename)
       filepath = os.path.join(self.basefolder_absdir, pdf_filename)
       with open(filepath, 'rb') as fd:
         pdf_obj = PdfFileReader(fd)
