@@ -16,6 +16,7 @@ Optional Parameter:
 """
 import glob
 import os
+import PyPDF2
 from PyPDF2 import PdfFileReader
 
 
@@ -72,8 +73,11 @@ class PageTotalPdfRenamer:
       print(seq, '=>', pdf_filename)
       filepath = os.path.join(self.basefolder_absdir, pdf_filename)
       with open(filepath, 'rb') as fd:
-        pdf_obj = PdfFileReader(fd)
-        n_of_pages = pdf_obj.getNumPages()
+        try:
+          pdf_obj = PdfFileReader(fd)
+          n_of_pages = pdf_obj.getNumPages()
+        except (PyPDF2.errors.PdfReadError, ValueError):
+          continue
         pdf_n_pagetotal_tuple = (pdf_filename, n_of_pages)
         print(seq, '/', total_pdfs, 'finding total pages as', n_of_pages, 'for', pdf_filename)
         print('-'*30)
