@@ -9,6 +9,7 @@ oscillator
 pyidle
 source-ifort-path
 local_settings.py
+bin_local_settings.py
 *~
 *.bak
 *.bin
