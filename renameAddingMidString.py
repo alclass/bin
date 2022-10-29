@@ -132,17 +132,23 @@ class Renamer:
     return new_name
 
   def prepare_renames_for_filename(self, old_filename):
-    name, ext_with_dot = os.path.splitext(old_filename)
+    """
+
     if name.endswith(self.include_str) or name.find(self.include_str) > -1:
       print('Filename [%s] has already included the given string to be added.' % name)
       return
+
+    :param old_filename:
+    :return:
+    """
+    name, ext_with_dot = os.path.splitext(old_filename)
     if self.pos == -1:
       new_name = name + self.include_str
     else:
       new_name = self.add_str_inbetween(name, old_filename)
     if new_name is None:
       return
-    new_namefilename = new_name + ext_with_dot
+    new_namefilename = new_name  # + ext_with_dot
     rename_pair = (old_filename, new_namefilename)
     self.rename_pairs.append(rename_pair)
 
