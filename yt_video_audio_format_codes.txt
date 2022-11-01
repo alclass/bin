@@ -1,0 +1,24 @@
+18           mp4        640x360    360p  423k , avc1.42001E, 30fps, mp4a.40.2 (44100Hz), 32.95MiB
+22           mp4        1280x720   720p  471k , avc1.64001F, 30fps, mp4a.40.2 (44100Hz) (best)
+133          mp4        426x240    240p   73k , mp4_dash container, avc1.4d4015@  73k, 30fps, video only, 5.72MiB
+134          mp4        640x360    360p  128k , mp4_dash container, avc1.4d401e@ 128k, 30fps, video only, 9.99MiB
+135          mp4        854x480    480p  190k , mp4_dash container, avc1.4d401f@ 190k, 30fps, video only, 14.79MiB
+136          mp4        1280x720   720p  342k , mp4_dash container, avc1.4d401f@ 342k, 30fps, video only, 26.59MiB
+137          mp4        1920x1080  1080p 1314k , mp4_dash container, avc1.640028@1314k, 30fps, video only, 102.16MiB
+140          m4a        audio only tiny  129k , m4a_dash container, mp4a.40.2@129k (44100Hz), 10.07MiB
+160          mp4        256x144    144p   48k , mp4_dash container, avc1.4d400c@  48k, 30fps, video only, 3.74MiB
+242          webm       426x240    240p  115k , webm_dash container, vp9@ 115k, 30fps, video only, 9.01MiB
+243          webm       640x360    360p  201k , webm_dash container, vp9@ 201k, 30fps, video only, 15.62MiB
+244          webm       854x480    480p  282k , webm_dash container, vp9@ 282k, 30fps, video only, 21.96MiB
+247          webm       1280x720   720p  474k , webm_dash container, vp9@ 474k, 30fps, video only, 36.86MiB
+248          webm       1920x1080  1080p 1490k , webm_dash container, vp9@1490k, 30fps, video only, 115.87MiB
+249          webm       audio only tiny   49k , webm_dash container, opus @ 49k (48000Hz), 3.87MiB
+250          webm       audio only tiny   59k , webm_dash container, opus @ 59k (48000Hz), 4.64MiB
+251          webm       audio only tiny  106k , webm_dash container, opus @106k (48000Hz), 8.29MiB
+278          webm       256x144    144p   83k , webm_dash container, vp9@  83k, 30fps, video only, 6.52MiB
+394          mp4        256x144    144p   61k , mp4_dash container, av01.0.00M.08@  61k, 30fps, video only, 4.79MiB
+395          mp4        426x240    240p  112k , mp4_dash container, av01.0.00M.08@ 112k, 30fps, video only, 8.77MiB
+396          mp4        640x360    360p  220k , mp4_dash container, av01.0.01M.08@ 220k, 30fps, video only, 17.12MiB
+397          mp4        854x480    480p  391k , mp4_dash container, av01.0.04M.08@ 391k, 30fps, video only, 30.42MiB
+398          mp4        1280x720   720p  772k , mp4_dash container, av01.0.05M.08@ 772k, 30fps, video only, 60.06MiB
+399          mp4        1920x1080  1080p 1450k , mp4_dash container, av01.0.08M.08@1450k, 30fps, video only, 112.77MiB
