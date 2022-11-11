@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-dlYouTubeWithIdsOnTxtFile2.py
+uTubeInsertRemoveYtidUpDirSqlite.py
+
 (notice that dlYouTubeWithIdsOnTxtFile3.py does the same but using a different approach)
 
 This scripts is a sort of caller-dispatcher
@@ -31,20 +32,17 @@ except ImportError:
 
 """
 import sys
-# import installed_apps_dirs as installed # local Python (bin) settings
-# from installed_apps_dirs import PYMIRROAPP_PATH
 from bin_local_settings import PYMIRROAPP_PATH
-sys.path.insert(0, PYMIRROAPP_PATH)
 approot = PYMIRROAPP_PATH + '/' + 'PyMirrorFileSystemsByHashSwDv'
 sys.path.insert(0, PYMIRROAPP_PATH)  # this is for the absolute import of the elsewhere-app
 sys.path.insert(1, approot)  # this is for the relative imports within the elsewhere-app
 __all__ = ['PyMirrorFileSystemsByHashSwDv', 'dlYouTubeWithIdsOnTxtFile2']
 # print(sys.path)
-from PyMirrorFileSystemsByHashSwDv.commands import dlYouTubeWithIdsOnTxtFile2 as d2
+from PyMirrorFileSystemsByHashSwDv.commands import uTubeInsertRemoveYtidUpDirSqlite as ins_missing_in_db
 
 
 def dispatch():
-    return d2.process(sys.argv)
+    return ins_missing_in_db.process(sys.argv)
 
 
 def adhoctest1():

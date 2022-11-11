@@ -28,7 +28,6 @@ except ImportError:
     print('Library VideoidsGrabberAndDownloader not found. Please revise [installed_apps_dirs.py] :', f)
   VideoidsGrabberAndDownloader = warning_msg
   sys.path.insert(0, installed.UTUBEAPP_PATH)
->>>>>>> 4bd1c972bc5a30a9fd594667f1659384a0ff1773
 
 """
 import sys
