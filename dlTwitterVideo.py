@@ -21,7 +21,7 @@ from bs4 import BeautifulSoup
 
 HTTPPOST_PAGE_URL = 'https://www.savetweetvid.com/downloader'
 HTTPPOST_FIELDNAME = 'url'
-CHARS_TO_REPLACE = '!?.:"“”/\\|'
+CHARS_TO_REPLACE = '!?.:"“”/\\|\t\r\n'
 
 
 def do_download(videourls_videotitles_tuplelist):

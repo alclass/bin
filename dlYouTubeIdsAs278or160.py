@@ -91,7 +91,6 @@ class YtIdDownloader:
     print('Downloaded', self.ytid, res)
     return True
 
-
   def download(self, seq=1):
     """
     TO-DO: it's feasable/viable to refactor this function to method classes
