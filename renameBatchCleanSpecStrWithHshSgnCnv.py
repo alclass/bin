@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
 renameBulkCleanSpecifiedStr.py
+
+This script under the hoods runs renameCleanSpecifiedString.py
+
+In script name the part HshSgnCnv means "hashsign convention" (see example below with "#" ending lines)
+
 @see renameCleanSpecifiedStr.py for the renaming with a string-pattern
 
 This script reads a text file * with "string items" and executes batch-renamings using script renameCleanSpecifiedStr.py
@@ -9,6 +14,13 @@ This script reads a text file * with "string items" and executes batch-renamings
 
 As of 2022-11-25 The default input text filename is [z-string-list.txt]
 Check source code for (constant) variable DEFAULT_RENAME_EXTENSION
+
+Example of file 'z-string-list.txt' (default name may be changed) contents:
+ Theory, Setup and Basic Storm #
+ Storm with Twitter Streams #
+ Beyond Storm Basics #
+ Storm Project and Hackathon #
+
 """
 import glob
 import os
