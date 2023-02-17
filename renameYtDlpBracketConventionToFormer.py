@@ -2,7 +2,10 @@
 """
 renameYtDlpBracketConventionToFormer.py
 
-This script aims to rename filenames under the yt-dlp naming convention to the yt-dl's older one.
+This script aims to rename filenames (in folder or in a text file) under the yt-dlp naming convention
+  to the yt-dl's older one.
+  => Use CLI-parameter -tf for running the renaming inside a text file (defaulted to 'z-names.txt')
+
 This yt-dlp convention is the following:
  => filename[ytid].ext
     ie, the 11-char ENC64 ytid is enclosed within brackets ('[' & ']') at end before the dot-extension
@@ -15,7 +18,10 @@ Example: file "abc [ytid].ext" is renamed to "abc-ytid.ext" where ytid is an 11-
 import glob
 import os
 import string
+import sys
+
 ENC64CHARS = string.ascii_uppercase + string.ascii_lowercase + string.digits + '-_'
+CHARS_TO_REMOVE_FROM_NAMES = ['：', '?', '!', '|']
 
 
 def is_str_an_enc64(word):
@@ -58,15 +64,68 @@ def generate_newfilename(fn):
   new_fn = name[: -13]
   new_fn = new_fn.rstrip(' \t\r\n')
   new_fn = new_fn + '-' + ytid + dotext
-  new_fn = new_fn.replace('：', '')
-  new_fn = new_fn.replace('?', '')
-  new_fn = new_fn.replace('!', '')
-  new_fn = new_fn.replace('|', '')
+  for c in CHARS_TO_REMOVE_FROM_NAMES:
+    new_fn = new_fn.replace(c, '')
   return new_fn
 
 
+class RenamerInTextFile:
+
+  def __init__(self, textfilename=None):
+    self.newtext = ''
+    if textfilename is None:
+      self.textfilename = 'z-names.txt'
+    else:
+      self.textfilename = textfilename
+    if not os.path.isfile(self.textfilename):
+      print('File', self.textfilename, 'does not exist. Please, reenter it.')
+      sys.exit(1)
+    self.current_text = open(self.textfilename).read()
+    self.process()
+
+  def process_textfile(self):
+    self.newtext = ''
+    lines = self.current_text.split('\n')
+    for line in lines:
+      fn = line.rstrip(' \t\r\n')
+      ytid = extract_ytid_from_filename_on_ytdlp_convention_or_none(fn)
+      if ytid is None:
+        continue
+      new_fn = generate_newfilename(fn)
+      self.newtext += new_fn + '\n'
+    self.newtext = self.newtext.rstrip(' \t\r\n')
+
+  def confirm_filewrite(self):
+    if len(self.newtext) == 0:
+      print('New file is empty, not writing it.')
+      return False
+    text = self.newtext
+    text = text.lstrip(' ').rstrip(' \t\r\n')
+    if len(text) == 0:
+      print('New file is empty, not writing it.')
+      return False
+    print('File to be save in folder:')
+    print('-'*40)
+    print(self.newtext)
+    print('='*40)
+    ans = input('Confirm file [%s] writing ? (y/N) [ENTER] means Yes ' % self.textfilename)
+    if ans.lower() in ['y', '']:
+      return True
+    print('No writing on file ' + self.textfilename)
+    return False
+
+  def process(self):
+    self.process_textfile()
+    if self.confirm_filewrite():
+      fd = open(self.textfilename, 'w')
+      fd.write(self.newtext)
+      fd.close()
+      print('Script wrote file', self.textfilename)
+    print(' === process end ===')
+
+
 class Renamer:
-  
+
   def __init__(self):
     self.rename_pairs = []
     self.renamed_n = 0
@@ -125,12 +184,44 @@ class Renamer:
       self.do_renames()
 
 
-def test_re():
+def if_cli_help_show_n_exit():
+  for arg in sys.argv:
+    if arg.startswith('-h') or arg.startswith('--help'):
+      print(__doc__)
+      sys.exit(0)
+
+
+def is_it_in_a_textfile():
+  for arg in sys.argv:
+    if arg.startswith('-tf'):
+      return True
+  return False
+
+
+def process():
   """
+
+  :return:
+  """
+  if_cli_help_show_n_exit()
+  if not is_it_in_a_textfile():
+    Renamer()
+  else:
+    RenamerInTextFile()
+
+
+if __name__ == '__main__':
+  # adoc_test()
+  process()
+
+
+def adoc_test():
+  """
+  Reg Exp approach was changed for a simpler char-index-look-up one
     res = recomp.match(t1)
-  if res:
-    print(res.group(1))
-  print(res)
+    if res:
+      print(res.group(1))
+    print(res)
 
   :return:
   """
@@ -154,16 +245,3 @@ def test_re():
   word = 'eRh1SçlPwdc'
   ans = is_str_an_enc64(word)
   print(word, ans)
-
-
-def process():
-  """
-
-  :return:
-  """
-  Renamer()
-
-
-if __name__ == '__main__':
-  # test_re()
-  process()
