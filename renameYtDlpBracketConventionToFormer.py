@@ -21,7 +21,7 @@ import string
 import sys
 
 ENC64CHARS = string.ascii_uppercase + string.ascii_lowercase + string.digits + '-_'
-CHARS_TO_REMOVE_FROM_NAMES = ['：', '?', '!', '|']
+CHARS_TO_REMOVE_FROM_NAMES = ['：', '？', '?', '!', '|','｜', '＂', '.']
 
 
 def is_str_an_enc64(word):
@@ -52,20 +52,29 @@ def extract_ytid_from_filename_on_ytdlp_convention_or_none(filename):
 
 def generate_newfilename(fn):
   """
-
   :param fn:
+	fn as input must be a
+	  name-ending-with-bracket-ytid-bracket
+	ie a name where:
+	  1) name[-14] is a left-brack ('[')
+	  2) name[-13:-2] is an ENC64 11-char string
+	  3) name[-1] is a right-brack (']')
+	function extract_ytid_from_filename_on_ytdlp_convention_or_none(fn)
+	  checks/guards it (fn)
   :return:
+    new_fn is the converted filename
   """
   # the extracting may have been done before, but it's repeated here as precaution
   ytid = extract_ytid_from_filename_on_ytdlp_convention_or_none(fn)
   if ytid is None:
     return None
   name, dotext = os.path.splitext(fn)
+  dotext = dotext.rstrip(' \t\r\n')
   new_fn = name[: -13]
   new_fn = new_fn.rstrip(' \t\r\n')
-  new_fn = new_fn + '-' + ytid + dotext
   for c in CHARS_TO_REMOVE_FROM_NAMES:
     new_fn = new_fn.replace(c, '')
+  new_fn = new_fn + '-' + ytid + dotext
   return new_fn
 
 
