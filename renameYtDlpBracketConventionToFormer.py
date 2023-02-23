@@ -21,7 +21,15 @@ import string
 import sys
 
 ENC64CHARS = string.ascii_uppercase + string.ascii_lowercase + string.digits + '-_'
-CHARS_TO_REMOVE_FROM_NAMES = ['：', '？', '?', '!', '|','｜', '＂', '.']
+CHARS_TO_REMOVE_FROM_NAMES = ['：', '？', '?', '!', '|','｜', '＂', '.', '⧸']  # ⧸ is not / [⧸/]
+
+
+def remove_exclchars_n_doublesps(word):
+  for c in CHARS_TO_REMOVE_FROM_NAMES:
+    word = word.replace(c, '')
+  while word.find('  ') > -1:
+    word = word.replace('  ', ' ')
+  return word
 
 
 def is_str_an_enc64(word):
@@ -72,8 +80,7 @@ def generate_newfilename(fn):
   dotext = dotext.rstrip(' \t\r\n')
   new_fn = name[: -13]
   new_fn = new_fn.rstrip(' \t\r\n')
-  for c in CHARS_TO_REMOVE_FROM_NAMES:
-    new_fn = new_fn.replace(c, '')
+  new_fn = remove_exclchars_n_doublesps(new_fn)
   new_fn = new_fn + '-' + ytid + dotext
   return new_fn
 
