@@ -108,7 +108,7 @@ class Rename:
 
     :return:
     '''
-    self.extension = self.arg.dotextension
+    self.extension = self.arg.extension
     if self.extension is None or self.extension == '':
       error_msg = 'extension argument is missing.'
       raise ValueError(error_msg)
