@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """
+The Python script does the things:
+1) it renames filenames in a directory
+2) or it renames "filenames" inside a text file
+
 renameYtDlpBracketConventionToFormer.py
 
 This script aims to rename filenames (in folder or in a text file) under the yt-dlp naming convention
@@ -21,7 +25,7 @@ import string
 import sys
 
 ENC64CHARS = string.ascii_uppercase + string.ascii_lowercase + string.digits + '-_'
-CHARS_TO_REMOVE_FROM_NAMES = ['：', '？', '?', '!', '|','｜', '＂', '.', '⧸']  # ⧸ is not / [⧸/]
+CHARS_TO_REMOVE_FROM_NAMES = ['：', '？', '?', '!', '|', '｜', '＂', '.', '⧸']  # ⧸ is not / [⧸/]
 
 
 def remove_exclchars_n_doublesps(word):
@@ -61,14 +65,14 @@ def extract_ytid_from_filename_on_ytdlp_convention_or_none(filename):
 def generate_newfilename(fn):
   """
   :param fn:
-	fn as input must be a
-	  name-ending-with-bracket-ytid-bracket
-	ie a name where:
-	  1) name[-14] is a left-brack ('[')
-	  2) name[-13:-2] is an ENC64 11-char string
-	  3) name[-1] is a right-brack (']')
-	function extract_ytid_from_filename_on_ytdlp_convention_or_none(fn)
-	  checks/guards it (fn)
+fn as input must be a
+  name-ending-with-bracket-ytid-bracket
+ie a name where:
+  1) name[-14] is a left-brack ('[')
+  2) name[-13:-2] is an ENC64 11-char string
+  3) name[-1] is a right-brack (']')
+function extract_ytid_from_filename_on_ytdlp_convention_or_none(fn)
+  checks/guards it (fn)
   :return:
     new_fn is the converted filename
   """
@@ -142,9 +146,10 @@ class RenamerInTextFile:
 
 class Renamer:
 
-  def __init__(self):
+  def __init__(self, autorename_ie_no_cli_confirm=False):
     self.rename_pairs = []
     self.renamed_n = 0
+    self.autorename_ie_no_cli_confirm = autorename_ie_no_cli_confirm
     self.process()
 
   def fetch_folder_files(self):
@@ -169,6 +174,8 @@ class Renamer:
       print(seq, 'Rename:')
       print('FROM: >>>%s' % old_name)
       print('TO:   >>>%s' % new_name)
+    if self.autorename_ie_no_cli_confirm:
+      return True
     ans = input('Confirm the %d renames above ? (y/N) [ENTER] means Yes ' % len(self.rename_pairs))
     if ans.lower() in ['y', '']:
       return True
@@ -214,14 +221,28 @@ def is_it_in_a_textfile():
   return False
 
 
+def is_there_a_y_for_no_cli_confirm_for_renames_from_sysargs():
+  """
+  boolean return will be attributed to variable autorename_ie_no_cli_confirm
+    True if there is a "-y" in the command line
+    False otherwise
+  :return:
+  """
+  for arg in sys.argv:
+    if arg.startswith('-y'):
+      return True
+  return False
+
+
 def process():
   """
 
   :return:
   """
   if_cli_help_show_n_exit()
+  autorename_ie_no_cli_confirm = is_there_a_y_for_no_cli_confirm_for_renames_from_sysargs()
   if not is_it_in_a_textfile():
-    Renamer()
+    Renamer(autorename_ie_no_cli_confirm)
   else:
     RenamerInTextFile()
 
