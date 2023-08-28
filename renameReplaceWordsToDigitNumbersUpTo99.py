@@ -104,9 +104,9 @@ class WordsToDigitsReplaceRenamer:
 
   def select_files_in_folder(self):
     filenames = os.listdir(self.basefolder_absdir)
-    filenames = filter(lambda f: f.endswith(self.dotextension), filenames)
+    filenames = list(filter(lambda f: f.endswith(self.dotextension), filenames))
     files = [os.path.join(self.basefolder_absdir, fn) for fn in filenames]
-    files = filter(lambda f: os.path.isfile(f), files)
+    files = list(filter(lambda f: os.path.isfile(f), files))
     sorted(files)
     self.filenames = [os.path.split(f)[1] for f in files]
 
