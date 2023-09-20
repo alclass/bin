@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 """
+On 2023-09-20 renamed app root foldername as shown in the constant attribution below:
+  PYMIRROAPP_PATH = '/home/dados/Sw3/ProdProjSw/DirTreeMirrorPys_PrdPrj'
+
 dlYouTubeWithIdsOnTxtFile2.py
 (notice that dlYouTubeWithIdsOnTxtFile3.py does the same but using a different approach)
 
@@ -35,12 +38,13 @@ import sys
 # from installed_apps_dirs import PYMIRROAPP_PATH
 from bin_local_settings import PYMIRROAPP_PATH
 sys.path.insert(0, PYMIRROAPP_PATH)
-approot = PYMIRROAPP_PATH + '/' + 'PyMirrorFileSystemsByHashSwDv'
+approot = PYMIRROAPP_PATH # + '/' + 'PyMirrorFileSystemsByHashSwDv'
 sys.path.insert(0, PYMIRROAPP_PATH)  # this is for the absolute import of the elsewhere-app
 sys.path.insert(1, approot)  # this is for the relative imports within the elsewhere-app
 __all__ = ['PyMirrorFileSystemsByHashSwDv', 'dlYouTubeWithIdsOnTxtFile2']
 # print(sys.path)
-from PyMirrorFileSystemsByHashSwDv.commands import dlYouTubeWithIdsOnTxtFile2 as d2
+# DirTreeMirrorPys_PrdPrj.
+from commands import dlYouTubeWithIdsOnTxtFile2 as d2
 
 
 def dispatch():
