@@ -30,16 +30,21 @@ except ImportError:
   print('Error: module', __all__, 'not found: see directory path for finding the app.')
   sys.exit(1)
 
+
+Notice on the config variable PYMIRROAPP_PATH
+
+The following config variable [PYMIRROAPP_PATH] has been 'conventioned'
+  here though its appname itself has been changed from time to time.
+
+So attention must be taken on the corresponding path set in bin_local_settings.py
+The value set there is not in git repo, ie app may be installed anywhere in the os-dirtree
+and the user must place its basefolderpath there.
 """
 import sys
 from bin_local_settings import PYMIRROAPP_PATH
-appfoldername = 'DirMirrorPy_PrdPrj'
-approot = PYMIRROAPP_PATH + '/' + appfoldername
-sys.path.insert(0, PYMIRROAPP_PATH)  # this is for the absolute import of the elsewhere-app
-sys.path.insert(1, approot)  # this is for the relative imports within the elsewhere-app
-__all__ = [appfoldername]
-# print(sys.path)
-from DirMirrorPy_PrdPrj.commands import uTubeInsertRemoveYtidUpDirSqlite as ins_missing_in_db
+appsrootpath = PYMIRROAPP_PATH
+sys.path.insert(1, appsrootpath)
+from commands import uTubeInsertRemoveYtidUpDirSqlite as ins_missing_in_db
 
 
 def dispatch():
