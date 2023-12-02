@@ -33,12 +33,13 @@ except ImportError:
 """
 import sys
 from bin_local_settings import PYMIRROAPP_PATH
-approot = PYMIRROAPP_PATH + '/' + 'PyMirrorFileSystemsByHashSwDv'
+appfoldername = 'DirMirrorPy_PrdPrj'
+approot = PYMIRROAPP_PATH + '/' + appfoldername
 sys.path.insert(0, PYMIRROAPP_PATH)  # this is for the absolute import of the elsewhere-app
 sys.path.insert(1, approot)  # this is for the relative imports within the elsewhere-app
-__all__ = ['PyMirrorFileSystemsByHashSwDv', 'dlYouTubeWithIdsOnTxtFile2']
+__all__ = [appfoldername]
 # print(sys.path)
-from PyMirrorFileSystemsByHashSwDv.commands import uTubeInsertRemoveYtidUpDirSqlite as ins_missing_in_db
+from DirMirrorPy_PrdPrj.commands import uTubeInsertRemoveYtidUpDirSqlite as ins_missing_in_db
 
 
 def dispatch():

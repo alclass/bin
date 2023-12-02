@@ -35,12 +35,13 @@ import sys
 # from installed_apps_dirs import PYMIRROAPP_PATH
 from bin_local_settings import PYMIRROAPP_PATH
 sys.path.insert(0, PYMIRROAPP_PATH)
-approot = PYMIRROAPP_PATH + '/' + 'PyMirrorFileSystemsByHashSwDv'
+appfoldername = 'DirMirrorPy_PrdPrj'
+approot = PYMIRROAPP_PATH + '/' + appfoldername
 sys.path.insert(0, PYMIRROAPP_PATH)  # this is for the absolute import of the elsewhere-app
 sys.path.insert(1, approot)  # this is for the relative imports within the elsewhere-app
-__all__ = ['PyMirrorFileSystemsByHashSwDv', 'dlYouTubeWithIdsOnTxtFile2']
+__all__ = [appfoldername, 'dlYouTubeWithIdsOnTxtFile2']
 # print(sys.path)
-from PyMirrorFileSystemsByHashSwDv.commands import dlYouTubeWithIdsOnTxtFile2 as d2
+from DirMirrorPy_PrdPrj.commands import dlYouTubeWithIdsOnTxtFile2 as d2
 
 
 def dispatch():
