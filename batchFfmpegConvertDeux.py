@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 batchFfmpegConvertDeux.py
   Explanation
+# -*- coding: utf-8 -*-
 """
 import glob
 import os
