@@ -1,35 +1,36 @@
 #!/usr/bin/env python3
 """
-unzipEachToFolder.py
-  unzips each zipfile in the current folder.
-
-Upgraded script from Python2 to Python3 on 2023-12-25
-  (with the oportunity of maching only having Python3...)
+/home/friend/bin/unzipEachToFolder.py
+    Unzips all zipfiles in the current (executing) directory
 """
 import glob
 import os
 
 
-def unzip_all_files_in_dir():
+def unzip():
+  total_unzipped = 0
   zips = glob.glob('*.zip')
-  n_of_unzipped = 0
-  for ezip in zips:
-    folder = ezip[:-4]
-    if os.path.isdir(folder):
+  for i, zipfilename in enumerate(zips):
+    name, ext = os.path.split(zipfilename)
+    foldername = name
+    if os.path.isdir(foldername):
+      # the unzipped contents go to a samename directory
+      # if it already exists, don't unzip and move on
       continue
-    scrmsg = f"{n_of_unzipped+1} unzipping file [{ezip}]"
+    comm_str = f'unzip "{zipfilename}" -d "{foldername}"'
+    seq = i + 1
+    scrmsg = f"{seq} unzipping [{zipfilename}] curr_n={total_unzipped}"
     print(scrmsg)
-    comm = f'unzip "{ezip}" -d "{folder}"'
-    retval = os.system(comm)
-    if retval == 0:
-      n_of_unzipped += 1
-  scrmsg = f"Total unzipped: {n_of_unzipped} ||| Total n. of zip files: {len(zips)}"
+    ret_value = os.system(comm_str)
+    if ret_value == 0:
+      total_unzipped += 1
+  scrmsg = f"Total unzipped:' {total_unzipped}, '| Total no. of zip files:', {len(zips)}"
   print(scrmsg)
 
 
 def process():
-  unzip_all_files_in_dir()
+  unzip()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   process()
