@@ -25,7 +25,7 @@ Previously, this script ran only under the current folder. In August 2023,
 """
 import os
 import sys
-from PyPDF2 import PdfFileReader
+from PyPDF2 import PdfReader  # got deprecated after PyPDF2 v3 use instead PdfReader
 from PyPDF2.errors import PdfReadError
 
 
@@ -111,8 +111,8 @@ class PageTotalPdfRenamer:
       print(seq, '=>', pdffilename)
       with open(pdffile, 'rb') as fd:
         try:
-          pdf_obj = PdfFileReader(fd)
-          n_of_pages = pdf_obj.getNumPages()
+          pdf_obj = PdfReader(fd)  # PdfFileReader got deprecated
+          n_of_pages = len(pdf_obj.pages)  # pdf_obj.getNumPages() got deprecated
         except (PdfReadError, ValueError):  # PyPDF2.errors.PdfReadError
           continue
         afterprocess_filenames.append(pdffilename)
