@@ -44,7 +44,10 @@ class Media:
 
   def issue_command(self):
     file_ext_less = os.path.splitext(self.media_file_from)[0]
-    mpx = file_ext_less + '.' + self.ext
+    if self.ext != 'mp3':
+      mpx = file_ext_less + '.' + self.ext
+    else:
+      mpx = file_ext_less + '.cnv.' + self.ext
     if os.path.isfile(mpx):
       print(mpx, 'exists. Jumping to next (if this one is not already the last one)...')
       return
