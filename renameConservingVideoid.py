@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Usage:
 $renameConservingVideoid.py [-e=<ext>] [-n=<newnames_input_filename>] [-dp=<'/home/user1/sci_videos'>]
@@ -126,7 +125,7 @@ class Renamer(object):
       old_file = rename_pair[0]
       new_file = rename_pair[1]
       old_filename = os.path.split(old_file)[1]
-      new_filename = os.path.split(old_file)[1]
+      new_filename = os.path.split(new_file)[1]
       print(i+1, 'Renaming', old_filename, 'TO', new_filename)
       os.rename(old_file, new_file)
     print('%d files were renamed.' % len(self.rename_pairs))
