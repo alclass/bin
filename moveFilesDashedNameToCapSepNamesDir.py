@@ -199,8 +199,36 @@ class FilenameItem:
       return list(middledirs_convention_str.split('/'))
     return None
 
-  def form_conventioned_topdirname(self):
-    return self.spaced_names_str + ' ' + self.conventioned_suffix_for_topdirname
+  def form_conventioned_topdirname(self, basedir):
+    """
+    Let's see the workings in this function by an example:
+    Suppose a topfolder exists with name "Albert Einstein 1920 book"
+    How can it be found?
+      1) middlepath is known, ie, it's "<basedir>/A/AL"
+      2) the prefixing topfolder name also is known, foldername begins with "Albert Einstein"
+      3) so the function can look up all entries in middle
+         and get the first one that starts with "Albert Einstein"
+         3.1) as a convention, it should only have one such prefixed-named directory
+      4) if it's not found, return the default one (in the time of writing, it's "Albert Einstein yyyy cc"
+    :param basedir: directory from which the "alphabet dirtree" raises
+    :return: topdirname the name of the move-file target directory
+    """
+    default_topdirname = self.spaced_names_str + ' ' + self.conventioned_suffix_for_topdirname
+    middlepath = self.form_basedir_plus_lettermiddlepath(basedir)
+    if not os.path.isdir(middlepath):
+      # if middlepath does not exist, topdirname also does not exist (it will be created "down stream")
+      return default_topdirname
+    direntries = sorted(os.listdir(middlepath))
+    for direntry in direntries:
+      fullentry = os.path.join(middlepath, direntry)
+      if not os.path.isdir(fullentry):
+        # entry might be a file, it doesn't count
+        continue
+      if direntry.startswith(self.spaced_names_str):
+        # found!
+        topdirname = direntry
+        return topdirname
+    return default_topdirname
 
   def form_basedir_plus_lettermiddlepath(self, basedir):
     """
@@ -211,7 +239,7 @@ class FilenameItem:
 
   def form_basedir_lettermiddlepath_n_convention(self, basedir):
     middlepath = self.form_basedir_plus_lettermiddlepath(basedir)
-    conventioned_topdirname = self.form_conventioned_topdirname()
+    conventioned_topdirname = self.form_conventioned_topdirname(basedir)
     return os.path.join(middlepath, conventioned_topdirname)
 
   def discover_an_folder_with_a_changedsufix(self, basedir):
@@ -255,7 +283,13 @@ class FilenameItem:
 
 class AlphabetFileMover:
 
-  def __init__(self, basedir, dot_ext=None, sourcedir=None):
+  def __init__(self, basedir=None, dot_ext=None, sourcedir=None):
+    """
+
+    :param basedir: directory from which the "alphabet treedir" raises, if None it's "../.." (parent of parent)
+    :param dot_ext:  the file extension of the moving files, it may or may not contain its prefixing dot
+    :param sourcedir: directory where the moving files reside, if None it's the current directory "."
+    """
     self.dot_ext = dot_ext
     self.treat_dot_ext()
     self.sourcedir = sourcedir
@@ -319,13 +353,22 @@ class AlphabetFileMover:
     print('='*40)
     for i, movepair in enumerate(self.move_pair_list):
       seq = i + 1
-      filename = movepair[0]
-      sourcefilepath = os.path.join(self.sourcedir, filename)
-      targetpath = movepair[1]
-      shutil.move(sourcefilepath, targetpath)
+      movefilename = movepair[0]
+      sourcefilepath = os.path.join(self.sourcedir, movefilename)
+      if not os.path.isfile(sourcefilepath):
+        print('\tsource does not exist :', sourcefilepath)
+        print('\t\tcontinuing...')
+        continue
+      targetdirpath = movepair[1]
+      targetfilepath = os.path.join(targetdirpath, movefilename)
+      if os.path.isfile(targetfilepath):
+        print('\ttarget file already exist:', sourcefilepath)
+        print('\t\tcan not move it, continuing...')
+        continue
+      shutil.move(sourcefilepath, targetdirpath)
       print(seq, 'Moved')
       print('\tFROM :', sourcefilepath)
-      print('\tTO   :', targetpath)
+      print('\tTO   :', targetdirpath)
 
   def treat_dot_ext(self):
     if self.dot_ext is None:
@@ -447,7 +490,10 @@ def get_args():
   sourcedir = None
   for arg in sys.argv:
     print(arg)
-    if arg.startswith('-b='):
+    if arg.startswith('-h'):
+      print(__doc__)
+      sys.exit(0)
+    elif arg.startswith('-b='):
       basedir = arg[len('-b='):]
     elif arg.startswith('-e='):
       dot_ext = arg[len('-e='):]
