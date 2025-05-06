@@ -62,7 +62,7 @@ def process():
   # Process videos in all directories using os.walk()
   for root, _, files in os.walk(args.input_dir):
     for filename in files:
-      if filename.endswith((".mp4", ".mkv", ".avi", ".mov")):  # Add more formats if needed
+      if filename.endswith((".mp4", ".mkv", ".avi", ".mov", ".wmv")):  # Add more formats if needed
         input_path = os.path.join(root, filename)
         output_path = os.path.join(args.output_dir, f"compressed_{filename}")
         # Check video resolution
