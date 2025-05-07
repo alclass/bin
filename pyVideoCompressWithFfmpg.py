@@ -47,7 +47,7 @@ def extract_width_n_height_from_cli_resolution_arg(args):
 
 
 # Function to get video resolution
-def get_video_resolution(video_path):
+def get_actual_video_resolution_of(video_path):
   cmd = [
     "ffprobe", "-v", "error",
     "-select_streams", "v:0",
@@ -76,49 +76,80 @@ class VideoCompressor:
   @property
   def trg_currdir_abspath(self):
     """
-    OBS: correct relative ongoing/working current folder
+    if target folder does not exist, create it
+
+    Here are the steps to derive trg_currdir_abspath:
+      1) the first interactive variable received from os.walk()
+         contains the ongoing abspath
+      2) subtracting the srcrootdir from it, one gets the
+         relative ongoing dirpath
+      3) adding the relative path to trgrootdir, one get the
+         absolute ongoing dirpath
     """
-    treepiece_relpath = self.trg_currdir_abspath[len(self.srctree_abspath):]
-    _trg_currdir_abspath = self.trgtree_abspath + '/' + treepiece_relpath
+    relative_working_dirpath = self.scr_currdir_abspath[len(self.srctree_abspath):]
+    if not relative_working_dirpath.startswith('/'):
+      relative_working_dirpath = '/' + relative_working_dirpath
+    _trg_currdir_abspath = self.trgtree_abspath + relative_working_dirpath
+    if os.path.isfile(_trg_currdir_abspath):
+      errmsg = f"Name {_trg_currdir_abspath} exists as file, program aborting at this point."
+      raise OSError(errmsg)
+    os.makedirs(_trg_currdir_abspath, exist_ok=True)
     return _trg_currdir_abspath
 
-  @property
-  def curr_output_file_abspath(self):
+  def get_curr_output_file_abspath(self, filename):
     """
-    OBS: correct relative ongoing/working current folder
+    To get the curr_output_file_abspath,
+      add the filename to self.trg_currdir_abspath
+
+    Notice that, by design, the output file must be
+      in the same relative path as the input file
+    Example:
+      src_abspath = '/media/user/disk1'
+      trg_abspath = '/media/user/disk2'
+      relativepath = '/sciences/physics/quantum_phys'
+      filename = 'quantum_gravity.pdf'
+    In this example, the abspath for the output file is:
+      trg_file_abspath = '/media/user/disk2/sciences/physics/quantum_phys/quantum_gravity.pdf'
     """
-    treepiece_relpath = self.curr_input_file_abspath[len(self.srctree_abspath):]
-    _curr_output_file_abspath = self.trgtree_abspath + '/' + treepiece_relpath
-    return _curr_output_file_abspath
+    return os.path.join(self.trg_currdir_abspath, filename)
+
+  def get_curr_input_file_abspath(self, filename):
+    """
+    @see docstring above for get_curr_output_file_abspath()
+    """
+    return os.path.join(self.src_currdir_abspath, filename)
 
   @property
   def resolution_with_colon(self):
     return f"{self.resolution_tuple[0]}:{self.resolution_tuple[1]}"
 
-  def process_command(self, input_path):
+  def process_command(self, filename):
     # FFmpeg command to resize and compress
+    input_file_abspath = self.get_curr_input_file_abspath(filename)
+    output_file_abspath = self.get_curr_output_file_abspath(filename)
     cmd = [
-      "ffmpeg", "-i", curr_input_file_abspath,
+      "ffmpeg", "-i", input_file_abspath,
       "-vf", f"scale={self.resolution_with_colon}",
       "-c:v", "libx264", "-crf", "28",
       "-preset", "fast",
       "-c:a", "aac", "-b:a", "64k",
-      self.curr_output_file_abspath
+      output_file_abspath
     ]
     # Execute the command
     try:
-      subprocess.run(cmd, check=True)
-      print(f"Successfully compressed: {filename} -> {args.resolution}")
+      print(cmd)
+      # subprocess.run(cmd, check=True)
+      # print(f"Successfully compressed: {filename} -> {args.resolution}")
     except subprocess.CalledProcessError:
       print(f"Error compressing: {filename}")
 
   def process_folder(self, files):
     for filename in files:
       if filename.endswith(tuple(self.dot_extensions)):  # Add more formats if needed
-        input_path = os.path.join(self.currdir_abspath, filename)
-        output_path = os.path.join(args.output_dir, f"compressed_{filename}")
+        input_file_abspath = self.get_curr_input_file_abspath(filename)
+        output_file_abspath = self.get_curr_output_file_abspath(filename)
         # Check video resolution
-        width, height = get_video_resolution(input_path)
+        width, height = get_actual_video_resolution_of(input_path)
         if width == target_width and height == target_height:
           print(f"Skipping {filename} (Already {args.resolution})")
           continue
@@ -136,13 +167,10 @@ class VideoCompressor:
 def get_args():
   """
   # Ensure the output directory exists
-  os.makedirs(args.output_dir, exist_ok=True)
-
-  :return:
+  :return: srctree_abspath, trgtree_abspath, resolution_tuple
   """
   srctree_abspath = args.input_dir
   trgtree_abspath = args.output_dir
-  # target_width, target_height = map(int, args.resolution.split(":"))
   resolution_tuple = extract_width_n_height_from_cli_resolution_arg(args)
   return srctree_abspath, trgtree_abspath, resolution_tuple
 
@@ -174,5 +202,19 @@ def process():
   return True
 
 
+def adhoc_test1():
+  srctree_abspath = args.input_dir
+  trgtree_abspath = args.output_dir
+  for ongoing, dirs, files in os.walk(srctree_abspath):
+    print('ongoing', ongoing)
+    relpath = ongoing[len(srctree_abspath):]
+    print('relpath', relpath)
+    print('dirs', dirs)
+    print('files', files[:2])
+
+
 if __name__ == '__main__':
+  """
   process()
+  """
+  adhoc_test1()
