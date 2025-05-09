@@ -2,13 +2,12 @@
 """
 pyVideoCompressWithFfmpg.py
 
-Usage
-=====
+Usage:
 
 $pyVideoCompressWithFfmpg.py --input-dir <source_dirtree_abspath>
    --output-dir <tareget_dirtree_abspath> [--resolution <height:width>]
 
-where:
+Where:
 
   --input-dir is the source dirtree abspath
   --output-dir is the target dirtree abspath
@@ -59,19 +58,19 @@ This script compresses videos from a directory upwards in a folder tree to
     this video will be compressed to the following file:
       /media/user/disk2/Science/Physics/Relativity/Einstein-01.mp4
   Notice:
-    5-1) filenames are the same, the compressed one in its equivalent reflected directory
-    5-2) if the resolutions of the source video given for compression is higher,
+    5-1 filenames are the same, the compressed one in its equivalent reflected directory
+    5-2 if the resolutions of the source video given for compression is higher,
       compression takes place
       (TO-DO: at this version, it's only checking the same resolution
         as the one given in parameter),
-    5-3) if a video has the same input resolution,
+    5-3 if a video has the same input resolution,
        processing for the video will not take place and the script goes for the next one.
 
 The Underlying Processing Program
 =================================
 
 This script uses the ffmpeg built-in Linux
-  (a tweat may be needed for another OS such as MacOS or Windows - or perhaps it may work without modification!)
+  (a tweat may be needed for another OS such as macOS or Windows - or perhaps it may work without modification!)
 
 At the time of writing this, the compression is hardcoded to 256x144
     TO-DO: make this compression resolution be changed via a CLI parameter
@@ -81,6 +80,7 @@ python compress_videos.py --resolution 320:180 --input_dir my_videos/
     --output_dir output_compressed/
 
 """
+import datetime
 import os
 import subprocess
 import os
@@ -101,12 +101,12 @@ args = parser.parse_args()
 def extract_width_n_height_from_cli_resolution_arg(p_args):
   """
   Extract target width and height from CLI argument
-  Used named p_args for argument, because IDE notices it as a shadow name
-    (ie there is a variable called 'args' in the program scope below)
+  Used named p_args for argument, because the IDE notices it as a shadow name
+    (i.e., there is a variable called 'args' in the program scope below)
 
   The name of the CLI argument is 'resolution' (if it's changed, it should be updated here)
 
-  :param p_args: the CLI  argument object
+  :param p_args: the CLI argument object
   :return resolution_tuple: a double (2-tuple) consisting of target_width, target_height
   """
   try:
@@ -153,14 +153,25 @@ class VideoCompressor:
     self.resolution_tuple = resolution_tuple
     self.treat_params()
     self.src_currdir_abspath = None
-    self.n_dirs = 0
+    self.n_dir_passing = 0
+    self.n_file_passing = 0
+    self.n_videos_processed = 0
+    self.n_videos_skipped = 0
+    self.n_errors_compressing = 0
+    self.n_dir_effected = 0
+    self.n_file_compressed = 0
+    self.n_dirs_for_compression = 0
+    self.n_files_for_compression = 0
+    self.begin_time = datetime.datetime.now()
+    self.end_time = None
 
   def treat_params(self):
     if not os.path.isdir(self.srctree_abspath):
       errmsg = f"Error: source dirtree path {self.srctree_abspath} does not exist."
       raise ValueError(errmsg)
     if self.resolution_tuple not in ACCEPTED_RESOLUTIONS:
-      errmsg = f"Error: In VideoCompress init() resolution {self.resolution_tuple} is not in list {ACCEPTED_RESOLUTIONS}"
+      errmsg = (f"Error: In VideoCompress init() resolution {self.resolution_tuple} is not in list"
+                f" {ACCEPTED_RESOLUTIONS}")
       raise ValueError(errmsg)
 
   @property
@@ -179,8 +190,8 @@ class VideoCompressor:
   def relative_working_dirpath(self):
     """
     The relative path is the path beyond srctree_abspath
-      and is given by a 'subtraction' so to say, ie
-        relative_dirpath = src_currdir_abspath[len(srctree_abspath):]
+      and is given by a 'subtraction' so to say, i.e.,
+        relative_dirpath = src_currdir_abspath[len(srctree_abspath): ]
 
     relative path can then be used to form the target directory
       that receives the compressed video
@@ -193,26 +204,30 @@ class VideoCompressor:
     return _relative_working_dirpath
 
   @property
-  def trg_currdir_abspath(self):
+  def trg_currdir_abspath(self) -> os.path:
     """
-    if target folder does not exist, create it
+    if the target folder does not exist, create it
 
     Here are the steps to derive trg_currdir_abspath:
       1) the first interactive variable received from os.walk()
          contains the ongoing abspath
       2) subtracting the srcrootdir from it, one gets the
          relative ongoing dirpath
-      3) adding the relative path to trgrootdir, one get the
+      3) adding the relative path to trgrootdir, one gets the
          absolute ongoing dirpath
     """
-    _trg_currdir_abspath = os.path.join(self.trgtree_abspath, self.relative_working_dirpath)
+    try:
+      _trg_currdir_abspath = os.path.join(self.trgtree_abspath, self.relative_working_dirpath)
+    except (OSError, ValueError) as e:
+      errmsg = f"In the method that derives the relative working path => {e}"
+      raise OSError(errmsg)
     if os.path.isfile(_trg_currdir_abspath):
       errmsg = f"Name {_trg_currdir_abspath} exists as file, program aborting at this point."
       raise OSError(errmsg)
     os.makedirs(_trg_currdir_abspath, exist_ok=True)
     return _trg_currdir_abspath
 
-  def get_curr_output_file_abspath(self, filename):
+  def get_curr_output_file_abspath(self, filename: str):
     """
     To get the curr_output_file_abspath,
       add the filename to self.trg_currdir_abspath
@@ -227,13 +242,32 @@ class VideoCompressor:
     In this example, the abspath for the output file is:
       trg_file_abspath = '/media/user/disk2/sciences/physics/quantum_phys/quantum_gravity.pdf'
     """
-    return os.path.join(self.trg_currdir_abspath, filename)
+    curr_output_file_abspath = os.path.join(self.trg_currdir_abspath, filename)
+    return curr_output_file_abspath
 
   def get_curr_input_file_abspath(self, filename):
     """
     @see docstring above for get_curr_output_file_abspath()
     """
     return os.path.join(self.src_currdir_abspath, filename)
+
+  def show_final_report(self):
+    self.end_time = datetime.datetime.now()
+    elapsed_time = self.end_time - self.begin_time
+    scrmsg = f"""Report after videocompressing
+    =========================================
+    srctree_abspath = {self.srctree_abspath}
+    trgtree_abspath = {self.trgtree_abspath}
+    n_videos_processed = {self.n_videos_processed}
+    n_dirs_for_processing = {self.n_dirs_for_compression}
+    n_files_for_compression = {self.n_files_for_compression}
+    n_errors_compressing = {self.n_errors_compressing}
+    n_videos_skipped = {self.n_videos_skipped}
+    begin_time = {self.begin_time}
+    end_time = {self.end_time}
+    elapsed_time = {elapsed_time}
+    """
+    print(scrmsg)
 
   def process_command(self, filename):
     # FFmpeg command to resize and compress
@@ -257,11 +291,22 @@ class VideoCompressor:
     ]
     # Execute the command
     try:
-      print(cmd)
-      # subprocess.run(cmd, check=True)
-      # print(f"Successfully compressed: {filename} -> {self.resolution_with_colon}")
+      scrmsg = '-'*40
+      print(scrmsg)
+      self.n_file_passing += 1
+      scrmsg = (f"{self.n_file_passing} | proc {self.n_videos_processed} | total {self.n_files_for_compression}"
+                f" filename {filename}")
+      print(scrmsg)
+      scrmsg = f"In folder {self.src_currdir_abspath}"
+      print(scrmsg)
+      scrmsg = '-'*40
+      print(scrmsg)
+      subprocess.run(cmd, check=True)
+      self.n_videos_processed += 1
+      print(f"{self.n_videos_processed} successfully compressed: {filename} -> {self.resolution_with_colon}")
       return 1
     except subprocess.CalledProcessError:
+      self.n_errors_compressing += 1
       print(f"Error compressing: {filename}")
       print(f"In directory {self.currdir_abspath}")
       return 0
@@ -274,24 +319,78 @@ class VideoCompressor:
         # Check video resolution
         width, height = get_actual_video_resolution_of(input_file_abspath)
         if width == self.target_width and height == self.target_height:
-          print(f"Skipping {filename} (Already {self.resolution_with_colon})")
+          self.n_videos_skipped += 1
+          print(f"{self.n_videos_skipped} skipping {filename} (Already {self.resolution_with_colon})")
           continue
         self.process_command(filename)
+
+  def process_in_oswalk(self):
+    for self.src_currdir_abspath, _, files in os.walk(self.srctree_abspath):
+      self.n_dir_passing += 1
+      scrmsg = (f"Dir {self.n_dir_passing} of {self.n_dirs_for_compression} "
+                f"processing videos in [{self.src_currdir_abspath}]")
+      print(scrmsg)
+      self.process_folder(files)
+    print(f"{self.n_videos_processed} videos processed in {self.n_dirs} directories")
+
+  def confirm_videoprocessing_with_the_counting(self):
+    scrmsg = f""" *** Confirmation needed
+    Confirm the videocompressing with the following counts:
+      source root dir = {self.srctree_abspath}
+      target root dir = {self.trgtree_abspath}
+      target extensions = {self.compressable_dot_extensions}
+      n_files_for_compression = {self.n_files_for_compression}
+      n_dirs_to_process = {self.n_dirs_for_compression}
+    -----------------------
+    [Y/n] ? [ENTER] means Yes
+    """
+    ans = input(scrmsg)
+    if ans in ['Y', 'y', '']:
+      return True
+    return False
+
+  def count_grouped_files_under_video_extensions(self, files):
+    n_files_for_compression = 0
+    for filename in files:
+      if filename.endswith(tuple(self.compressable_dot_extensions)):
+        n_files_for_compression += 1
+        scrmsg = f"{n_files_for_compression} counting, {self.n_files_for_compression} counted"
+        print(scrmsg)
+        scrmsg = f"{filename} in [{self.src_currdir_abspath}]"
+        print(scrmsg)
+    return n_files_for_compression
+
+  def precount_dirs_n_files(self):
+    print("Precounting dirs & files for videocompressing")
+    print(f"looking and counting those with extensions: {self.compressable_dot_extensions}")
+    self.n_dirs_for_compression = 0
+    self.n_files_for_compression = 0
+    for self.src_currdir_abspath, _, files in os.walk(self.srctree_abspath):
+      n_files = self.count_grouped_files_under_video_extensions(files)
+      if n_files > 0:
+        self.n_dirs_for_compression += 1
+        self.n_files_for_compression += n_files
 
   def process(self):
     """
     Process videos in all directories using os.walk()
+
+    Class process chain:
+      1) previously count all directories and files eligible for videocompressing
+        1-1 so that at each file processing, a message may inform n_processed/total
+      2) confirm/allow starting of videocompressing with such and such dirs & files
+      2) process videocompressing
+      3) output final processing report
     """
-    self.n_dirs = 0
-    for self.src_currdir_abspath, _, files in os.walk(args.input_dir):
-      self.n_dirs += 1
-      scrmsg = f"Dir {self.n_dirs} processing videos in [{self.src_currdir_abspath}]"
-      print(scrmsg)
-      self.process_folder(files)
-    print(f"All videos processed in {self.n_dirs} directories")
+    self.precount_dirs_n_files()
+    if not self.confirm_videoprocessing_with_the_counting():
+      return False
+    self.process_in_oswalk()
+    self.show_final_report()
+    return True
 
 
-def get_args():
+def get_cli_args():
   """
   # Ensure the output directory exists
   :return: srctree_abspath, trgtree_abspath, resolution_tuple
@@ -302,8 +401,8 @@ def get_args():
   return srctree_abspath, trgtree_abspath, resolution_tuple
 
 
-def process():
-  srctree_abspath, trgtree_abspath, resolution_tuple = get_args()
+def confirm_cli_args_with_user():
+  srctree_abspath, trgtree_abspath, resolution_tuple = get_cli_args()
   print(srctree_abspath, trgtree_abspath, resolution_tuple)
   if not os.path.isdir(srctree_abspath):
     scrmsg = "Source directory [{srctree_abspath}] does not exist. Please, retry."
@@ -314,19 +413,21 @@ def process():
     print(scrmsg)
     return False
   print('Paramters')
+  print('='*20)
   scrmsg = f"Source directory = [{srctree_abspath}]"
   print(scrmsg)
   scrmsg = f"Target directory = [{trgtree_abspath}]"
   print(scrmsg)
   scrmsg = f"Resolution = [{resolution_tuple}]"
   print(scrmsg)
+  print('='*20)
   scrmsg = "The parameters are okay? (Y/n) [ENTER] means Yes "
   ans = input(scrmsg)
-  if ans not in ['Y', 'y', '']:
-    return False
-  vcompressor = VideoCompressor(srctree_abspath, trgtree_abspath, resolution_tuple)
-  vcompressor.process()
-  return True
+  print('='*20)
+  confirmed = False
+  if ans in ['Y', 'y', '']:
+    confirmed = True
+  return confirmed, srctree_abspath, trgtree_abspath, resolution_tuple
 
 
 def adhoc_test1():
@@ -340,6 +441,15 @@ def adhoc_test1():
     print('relpath', relpath)
     print('dirs', dirs)
     print('files', files[:2])
+
+
+def process():
+  confirmed, srctree_abspath, trgtree_abspath, resolution_tuple = confirm_cli_args_with_user()
+  if confirmed:
+    vcompressor = VideoCompressor(srctree_abspath, trgtree_abspath, resolution_tuple)
+    vcompressor.process()
+    return True
+  return False
 
 
 if __name__ == '__main__':
