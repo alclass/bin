@@ -78,21 +78,19 @@ At the time of writing this, the compression is hardcoded to 256x144
 Usage:
 python compress_videos.py --resolution 320:180 --input_dir my_videos/
     --output_dir output_compressed/
-
 """
-import datetime
-import os
-import subprocess
-import os
-import subprocess
 import argparse
+import datetime
 import logging
+import os
+import subprocess
 import time
-# Configure logging (move the hardcoded folderpaths later to somewhere else - a kind of configfile)
-log_folder = '/home/friend/bin/logs'
+# Configure logging (TODO move the hardcoded folderpaths later to somewhere else - a kind of configfile)
+users_home_dir = os.path.expanduser("~")
+log_folder = f"{users_home_dir}/bin/logs"
 log_filename = f"{time.strftime('%Y-%m-%d_%H-%M-%S')} video compression errors.log"
 log_file_abspath = os.path.join(log_folder, log_filename)
-logging.basicConfig(filename=log_filename,
+logging.basicConfig(filename=log_file_abspath,
                     level=logging.ERROR,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 DEFAULT_RESOLUTION_WIDTH_HEIGHT = (256, 144)  # 256:144
@@ -161,18 +159,16 @@ class VideoCompressor:
     self.trgtree_abspath = trgtree_abspath
     self.resolution_tuple = resolution_tuple
     self.treat_params()
-    self.src_currdir_abspath = None
-    self.n_dir_passing = 0
+    self.src_currdir_abspath = None  # its trg equivalent is a class property (ie dynamically found)
     self.n_file_passing = 0
+    self.n_dir_passing = 0
     self.n_videos_processed = 0
     self.n_videos_skipped = 0
     self.n_files_existing_in_trg = 0
     self.n_files_not_existing_in_src = 0
     self.n_errors_compressing = 0
-    self.n_dir_effected = 0
-    self.n_file_compressed = 0
-    self.n_dirs_for_compression = 0
     self.n_files_for_compression = 0
+    self.n_dirs_for_compression = 0
     self.begin_time = datetime.datetime.now()
     self.end_time = None
 
@@ -278,8 +274,10 @@ class VideoCompressor:
     =========================================
     srctree_abspath = {self.srctree_abspath}
     trgtree_abspath = {self.trgtree_abspath}
-    n_videos_processed = {self.n_videos_processed}
+    n_dirs_passed = {self.n_dir_passing}
     n_dirs_for_processing = {self.n_dirs_for_compression}
+    n_videos_processed = {self.n_videos_processed}
+    n_files_passed = {self.n_file_passing}
     n_files_for_compression = {self.n_files_for_compression}
     n_errors_compressing = {self.n_errors_compressing}
     n_videos_skipped = {self.n_videos_skipped}
@@ -294,14 +292,14 @@ class VideoCompressor:
     if not os.path.isfile(input_file_abspath):
       self.n_files_not_existing_in_src += 1
       numbering = f"{self.n_files_not_existing_in_src} / {self.n_file_passing} / {self.n_files_for_compression}"
-      scrmsg = f'{numbering} file {input_file_abspath} does not exist. Returing.'
+      scrmsg = f"{numbering} file {input_file_abspath} does not exist. Returing."
       print(scrmsg)
       return 0
     output_file_abspath = self.get_curr_output_file_abspath(filename)
     if os.path.isfile(output_file_abspath):
       self.n_files_existing_in_trg += 1
       numbering = f"{self.n_files_existing_in_trg} / {self.n_file_passing} / {self.n_files_for_compression}"
-      scrmsg = f'{numbering} file [{output_file_abspath}] already exists. Not processing, returing.'
+      scrmsg = f"{numbering} file [{output_file_abspath}] already exists. Not processing, returing."
       print(scrmsg)
       return 0
     # FFmpeg command to resize and compress
@@ -334,14 +332,14 @@ class VideoCompressor:
       strline = "-"*35
       print(strline)
       logging.error(strline)
-      errmsg = (f"Error compressing: {self.n_errors_compressing} / {self.n_file_passing}"
-                f" / {self.n_files_for_compression}")
+      errmsg = (f"Error compressing: errors: {self.n_errors_compressing} / visited: {self.n_file_passing}"
+                f" / total: {self.n_files_for_compression}")
       print(errmsg)
       logging.error(errmsg)
-      errmsg = f"\tError compressing file/video: [{filename}]"
+      errmsg = f"\terror compressing file/video: [{filename}]"
       print(errmsg)
       logging.error(errmsg)
-      errmsg = f"\tIn directory [{self.src_currdir_abspath}]"
+      errmsg = f"\tin directory [{self.src_currdir_abspath}]"
       print(errmsg)
       logging.error(errmsg)
       strline = "-"*35
@@ -366,14 +364,15 @@ class VideoCompressor:
     self.n_file_passing = 0
     for self.src_currdir_abspath, _, files in os.walk(self.srctree_abspath):
       self.n_dir_passing += 1
-      scrmsg = (f"Dir {self.n_dir_passing} of {self.n_dirs_for_compression} "
-                f"processing videos in [{self.src_currdir_abspath}]")
+      scrmsg = (f"Visited dirs {self.n_dir_passing} | total dirs {self.n_dirs_for_compression} "
+                f"| processing videos in [{self.src_currdir_abspath}]")
       print(scrmsg)
       self.process_folder(files)
     print(f"{self.n_videos_processed} videos processed in {self.n_dirs} directories")
 
   def confirm_videoprocessing_with_the_counting(self):
-    scrmsg = f""" *** Confirmation needed
+    scrmsg = f""" =========================
+    *** Confirmation needed
     Confirm the videocompressing with the following counts:
       source root dir = {self.srctree_abspath}
       target root dir = {self.trgtree_abspath}
@@ -465,6 +464,8 @@ def confirm_cli_args_with_user():
   scrmsg = f"Target directory = [{trgtree_abspath}]"
   print(scrmsg)
   scrmsg = f"Resolution = [{resolution_tuple}]"
+  print(scrmsg)
+  scrmsg = f"Error-log file = [{log_file_abspath}]"
   print(scrmsg)
   print('='*20)
   scrmsg = "The parameters are okay? (Y/n) [ENTER] means Yes "
