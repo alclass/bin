@@ -1,4 +1,5 @@
 .vscode/
+logs/
 venv/
 .idea/
 bin_non_gitable/
@@ -15,6 +16,7 @@ bin_local_settings.py
 *.bin
 *.ex
 *.desktop
+*.log
 *.pyc
 *.sqlite
 .directory

@@ -86,6 +86,15 @@ import subprocess
 import os
 import subprocess
 import argparse
+import logging
+import time
+# Configure logging (move the hardcoded folderpaths later to somewhere else - a kind of configfile)
+log_folder = '/home/friend/bin/logs'
+log_filename = f"{time.strftime('%Y-%m-%d_%H-%M-%S')} video compression errors.log"
+log_file_abspath = os.path.join(log_folder, log_filename)
+logging.basicConfig(filename=log_filename,
+                    level=logging.ERROR,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 DEFAULT_RESOLUTION_WIDTH_HEIGHT = (256, 144)  # 256:144
 DEFAULT_COMPRESSABLE_DOT_EXTENSIONS = [".mp4", ".mkv", ".avi", ".mov", ".wmv"]
 ACCEPTED_RESOLUTIONS = [(256, 144), (426, 240), (640, 360), (854, 480), (1280, 720)]
@@ -157,6 +166,8 @@ class VideoCompressor:
     self.n_file_passing = 0
     self.n_videos_processed = 0
     self.n_videos_skipped = 0
+    self.n_files_existing_in_trg = 0
+    self.n_files_not_existing_in_src = 0
     self.n_errors_compressing = 0
     self.n_dir_effected = 0
     self.n_file_compressed = 0
@@ -281,12 +292,16 @@ class VideoCompressor:
   def process_command(self, filename):
     input_file_abspath = self.get_curr_input_file_abspath(filename)
     if not os.path.isfile(input_file_abspath):
-      scrmsg = f'File {input_file_abspath} does not exist. Returing.'
+      self.n_files_not_existing_in_src += 1
+      numbering = f"{self.n_files_not_existing_in_src} / {self.n_file_passing} / {self.n_files_for_compression}"
+      scrmsg = f'{numbering} file {input_file_abspath} does not exist. Returing.'
       print(scrmsg)
       return 0
     output_file_abspath = self.get_curr_output_file_abspath(filename)
     if os.path.isfile(output_file_abspath):
-      scrmsg = f'File {output_file_abspath} already exists. Not processing, returing.'
+      self.n_files_existing_in_trg += 1
+      numbering = f"{self.n_files_existing_in_trg} / {self.n_file_passing} / {self.n_files_for_compression}"
+      scrmsg = f'{numbering} file [{output_file_abspath}] already exists. Not processing, returing.'
       print(scrmsg)
       return 0
     # FFmpeg command to resize and compress
@@ -316,8 +331,21 @@ class VideoCompressor:
       return 1
     except subprocess.CalledProcessError:
       self.n_errors_compressing += 1
-      print(f"Error compressing: {filename}")
-      print(f"In directory {self.currdir_abspath}")
+      strline = "-"*35
+      print(strline)
+      logging.error(strline)
+      errmsg = (f"Error compressing: {self.n_errors_compressing} / {self.n_file_passing}"
+                f" / {self.n_files_for_compression}")
+      print(errmsg)
+      logging.error(errmsg)
+      errmsg = f"\tError compressing file/video: [{filename}]"
+      print(errmsg)
+      logging.error(errmsg)
+      errmsg = f"\tIn directory [{self.src_currdir_abspath}]"
+      print(errmsg)
+      logging.error(errmsg)
+      strline = "-"*35
+      print(strline)
       return 0
 
   def process_folder(self, files):
@@ -467,6 +495,7 @@ def process():
     vcompressor = VideoCompressor(srctree_abspath, trgtree_abspath, resolution_tuple)
     vcompressor.process()
     return True
+  logging.shutdown()
   return False
 
 
