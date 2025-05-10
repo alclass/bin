@@ -14,8 +14,8 @@ Where:
   --resolution is the video-resolution as width and height
     if --resolution is not given, it defaults to 256:144
 
-Beyond 256:144, common ones are:
-  426x240 640x360 854x480 1280x720
+Beyond 256:144, accepted ones are:
+ 2) 426x240 | 3) 640x360 | 4) 854x480 | 5) 1280x720
 
 Example Usage
 ==============
@@ -234,13 +234,22 @@ class VideoCompressor:
 
     Notice that, by design, the output file must be
       in the same relative path as the input file
+
     Example:
-      src_abspath = '/media/user/disk1'
-      trg_abspath = '/media/user/disk2'
-      relativepath = '/sciences/physics/quantum_phys'
-      filename = 'quantum_gravity.pdf'
-    In this example, the abspath for the output file is:
-      trg_file_abspath = '/media/user/disk2/sciences/physics/quantum_phys/quantum_gravity.pdf'
+      a) suppose the following context with directories and files:
+        src_abspath = '/media/user/disk1'
+        trg_abspath = '/media/user/disk2'
+        relativepath = '/sciences/physics/quantum_phys'
+        filename = 'quantum_gravity.pdf'
+
+      b) joining the "pieces" of this example, the abspath for the input file is:
+        scr_file_abspath = '/media/user/disk1/sciences/physics/quantum_phys/quantum_gravity.pdf'
+
+      b) joining the "pieces" of this example, the abspath for the output file is:
+        trg_file_abspath = '/media/user/disk2/sciences/physics/quantum_phys/quantum_gravity.pdf'
+
+      Notice that the only difference is in the root dir-abspath-part,
+        relative-path and filename are the same
     """
     curr_output_file_abspath = os.path.join(self.trg_currdir_abspath, filename)
     return curr_output_file_abspath
@@ -270,7 +279,6 @@ class VideoCompressor:
     print(scrmsg)
 
   def process_command(self, filename):
-    # FFmpeg command to resize and compress
     input_file_abspath = self.get_curr_input_file_abspath(filename)
     if not os.path.isfile(input_file_abspath):
       scrmsg = f'File {input_file_abspath} does not exist. Returing.'
@@ -281,6 +289,7 @@ class VideoCompressor:
       scrmsg = f'File {output_file_abspath} already exists. Not processing, returing.'
       print(scrmsg)
       return 0
+    # FFmpeg command to resize and compress
     cmd = [
       "ffmpeg", "-i", input_file_abspath,
       "-vf", f"scale={self.resolution_with_colon}",
@@ -293,7 +302,6 @@ class VideoCompressor:
     try:
       scrmsg = '-'*40
       print(scrmsg)
-      self.n_file_passing += 1
       scrmsg = (f"{self.n_file_passing} | proc {self.n_videos_processed} | total {self.n_files_for_compression}"
                 f" filename {filename}")
       print(scrmsg)
@@ -303,7 +311,8 @@ class VideoCompressor:
       print(scrmsg)
       subprocess.run(cmd, check=True)
       self.n_videos_processed += 1
-      print(f"{self.n_videos_processed} successfully compressed: {filename} -> {self.resolution_with_colon}")
+      print(f"{self.n_videos_processed} / {self.n_file_passing} / {self.n_files_for_compression}"
+            f" successfully compressed: {filename} -> {self.resolution_with_colon}")
       return 1
     except subprocess.CalledProcessError:
       self.n_errors_compressing += 1
@@ -313,18 +322,20 @@ class VideoCompressor:
 
   def process_folder(self, files):
     for filename in files:
+      self.n_file_passing += 1
       if filename.endswith(tuple(self.compressable_dot_extensions)):
         input_file_abspath = self.get_curr_input_file_abspath(filename)
-        # output_file_abspath = self.get_curr_output_file_abspath(filename)
         # Check video resolution
         width, height = get_actual_video_resolution_of(input_file_abspath)
         if width == self.target_width and height == self.target_height:
           self.n_videos_skipped += 1
-          print(f"{self.n_videos_skipped} skipping {filename} (Already {self.resolution_with_colon})")
+          print(f"{self.n_videos_skipped} / {self.n_file_passing} skipping {filename}"
+                f" (already {self.resolution_with_colon})")
           continue
         self.process_command(filename)
 
   def process_in_oswalk(self):
+    self.n_file_passing = 0
     for self.src_currdir_abspath, _, files in os.walk(self.srctree_abspath):
       self.n_dir_passing += 1
       scrmsg = (f"Dir {self.n_dir_passing} of {self.n_dirs_for_compression} "
@@ -376,11 +387,18 @@ class VideoCompressor:
     Process videos in all directories using os.walk()
 
     Class process chain:
-      1) previously count all directories and files eligible for videocompressing
-        1-1 so that at each file processing, a message may inform n_processed/total
-      2) confirm/allow starting of videocompressing with such and such dirs & files
-      2) process videocompressing
-      3) output final processing report
+      1) before start processing, count all directories & files eligible for videocompressing
+        1-1 so that, on starting each videofile compression,
+            a screen message will inform n_processed / n_iterated / total
+        1-2 the triple mentioned above is:
+            n_process is number of videos compressed
+            n_iterated is number of files looped over
+            total is the total number of eligible files (videos having the target file-extensions)
+      2) confirm/allow starting of videocompressing with the numbers counted above
+        i.e., the user wants to proceed with the numbers collected?
+      3) process videocompressing
+        video compression is done by the underlying ffmpeg OS tool (so it must be available)
+      4) output final processing report
     """
     self.precount_dirs_n_files()
     if not self.confirm_videoprocessing_with_the_counting():
