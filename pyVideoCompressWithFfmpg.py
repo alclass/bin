@@ -196,6 +196,7 @@ class VideoCompressor:
     self.n_errors_compressing = 0  # counts when exception subprocess. is raised
     self.n_files_for_compression = 0  # counts ffmpeg commands gone to completion
     self.n_dirs_for_compression = 0  # counts total directories that have videos for compression
+    self.compress_marktime = None  # marks time at the end of a videocompression, also used in duration averaging
     self.begin_time = datetime.datetime.now()  # marks script's begintime
     self.end_time = None  # will mark script's endtime at the report calling time
 
@@ -321,6 +322,21 @@ class VideoCompressor:
     """
     print(scrmsg)
 
+  def get_triple_elapsed_avg_n_now_inbetween_compressions(self):
+    """
+
+    :return: elapsed, average
+    """
+    now = datetime.datetime.now()
+    if self.n_file_passing < 1:
+      return 0.0, 0.0, now
+    elapsed = now - self.compress_marktime
+    if self.n_file_passing < 2:
+      return elapsed, 0.0, now
+    n_compressions = self.n_file_passing - 1
+    average = elapsed / n_compressions
+    return elapsed, average, now
+
   def process_command(self, filename):
     input_file_abspath = self.get_curr_input_file_abspath(filename)
     if not os.path.isfile(input_file_abspath):
@@ -354,12 +370,17 @@ class VideoCompressor:
       scrmsg = (f"{self.n_file_passing} | proc {self.n_videos_processed} | total {self.n_files_for_compression}"
                 f" filename {filename}")
       print(scrmsg)
-      scrmsg = f"In folder {self.src_currdir_abspath}"
+      scrmsg = f"\tin folder {self.src_currdir_abspath}"
+      print(scrmsg)
+      elapsed, average, now = self.get_triple_elapsed_avg_n_now_inbetween_compressions()
+      scrmsg = (f" \t{now} => times: last compression duration: {elapsed} secs"
+                f" | average duration until now: {average} secs")
       print(scrmsg)
       scrmsg = '-'*40
       print(scrmsg)
       subprocess.run(cmd, check=True)
       self.n_videos_processed += 1
+      self.compress_marktime = datetime.datetime.now()
       print(f"{self.n_videos_processed} / {self.n_file_passing} / {self.n_files_for_compression}"
             f" successfully compressed: {filename} -> {self.resolution_with_colon}")
       return True
