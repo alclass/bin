@@ -94,10 +94,8 @@ import shutil
 import subprocess
 import sys
 import time
-from pandas import timedelta_range
-
 DEFAULT_RESOLUTION_WIDTH_HEIGHT = (256, 144)  # 256:144
-DEFAULT_COMPRESSABLE_DOT_EXTENSIONS = [".mp4", ".mkv", ".avi", ".mov", ".wmv"]
+DEFAULT_COMPRESSABLE_DOT_EXTENSIONS = [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".m4v"]
 ACCEPTED_RESOLUTIONS = [(256, 144), (426, 240), (640, 360), (854, 480), (1280, 720)]
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Compress videos to a specified resolution.")
@@ -110,25 +108,20 @@ parser.add_argument("--resolution", type=str, default="256:144",
 args = parser.parse_args()
 
 
-def get_triple_elapsed_avg_n_now_inbetween_compressions(begin_time, n_passing, timemark):
+def get_totalelapsed_n_avg_inbetween_compressions(begin_time, n_compressions):
   """
   Returns a triple with:
-    elapsed: the duration of last compression
+    totalelapsed: the duration of last compression
     average: average duration for all previous compressions
     now: the actual time marking "compress frontiers"
-  :return: elapsed, average, now
+  :return: totalelapsed, average, now
   """
   now = datetime.datetime.now()
-  elapsed = now - timemark
-  # assigning now to compress_marktime for "next time coming here"
-  if n_passing < 1:
-    return 0.0, 0.0, now  # before the first compression, elapsed and average are zero
-  if n_passing < 2:
-    return elapsed, elapsed, now  # for the first compression, average equals elapsed
-  n_compressions = n_passing - 1
-  elapsed_uptilnow = now - begin_time
-  average = elapsed_uptilnow / n_compressions
-  return elapsed, average, now
+  totalelapsed = now - begin_time
+  if n_compressions < 1:
+    return 0.0, 0.0  # before the first compression, totalelapsed and average are zero
+  average = totalelapsed / n_compressions
+  return totalelapsed, average
 
 
 class Log:
@@ -216,12 +209,12 @@ class VideoCompressor:
     self.n_videos_skipped = 0  # counts videofiles skipped (either because they were not found or exist in target)
     self.n_videos_copied_over = 0  # counts videos that have already the same target resolution (the copied over)
     self.n_failed_videos_copied_over = 0  # counts failed copies-over
-    self.n_files_existing_in_trg = 0  # counts videofiles that exist in target
-    self.n_files_not_existing_in_src = 0  # counts videofiles that don't exist in the source (were moved out?)
+    self.n_videos_existing_in_trg = 0  # counts videofiles that exist in target
+    self.n_videos_not_existing_in_src = 0  # counts videofiles that don't exist in the source (were moved out?)
     self.n_errors_compressing = 0  # counts when exception subprocess. is raised
-    self.n_files_for_compression = 0  # counts ffmpeg commands gone to completion
+    self.n_videos_for_compression = 0  # counts ffmpeg commands gone to completion
     self.n_dirs_for_compression = 0  # counts total directories that have videos for compression
-    self.compress_marktime = datetime.datetime.now()  # marks time at a videocompression, helps in duration averaging
+    self.compress_timemark = datetime.datetime.now()  # marks time at a videocompression, helps in duration averaging
     self.begin_time = datetime.datetime.now()  # it marks script's begintime
     self.end_time = None  # will mark script's endtime at the report calling time
 
@@ -262,6 +255,11 @@ class VideoCompressor:
     if _relative_working_dirpath.startswith('/'):
       _relative_working_dirpath = _relative_working_dirpath.lstrip('/')
     return _relative_working_dirpath
+
+  @property
+  def n_videos_yet_to_compress(self):
+    total_already_processed = self.n_videos_processed + self.n_videos_skipped + self.n_videos_existing_in_trg
+    return self.n_videos_for_compression - total_already_processed - self.n_videos_not_existing_in_src
 
   @property
   def trg_currdir_abspath(self) -> os.path:
@@ -323,7 +321,8 @@ class VideoCompressor:
   def show_final_report(self):
     self.end_time = datetime.datetime.now()
     elapsed_time = self.end_time - self.begin_time
-    scrmsg = f"""Report after videocompressing
+    scrmsg = f"""=========================================
+    Report after videocompressing
     =========================================
     src_rootdir_abspath = {self.src_rootdir_abspath}
     trg_rootdir_abspath = {self.trg_rootdir_abspath}
@@ -331,16 +330,17 @@ class VideoCompressor:
     -----------------------------------------
     total dirs visited = {self.n_dir_passing}
     total dirs for processing = {self.n_dirs_for_compression}
-    total videos processed = {self.n_videos_processed}
+    total videos compressed = {self.n_videos_processed}
     total files visited = {self.n_file_passing}
     total videos visited = {self.n_video_passing}
     total files = {self.total_files}
-    total videos for compression = {self.n_files_for_compression}
+    total videos for compression = {self.n_videos_for_compression}
     total videos copied over = {self.n_videos_copied_over}
     total failed copied over = {self.n_failed_videos_copied_over}
     total videos skipped = {self.n_videos_skipped}
-    total files not existing in src = {self.n_files_not_existing_in_src}
-    total files existing in trg = {self.n_files_existing_in_trg}
+    videos yet to compress = {self.n_videos_yet_to_compress}
+    total files not existing in src = {self.n_videos_not_existing_in_src}
+    total files existing in trg = {self.n_videos_existing_in_trg}
     total compression errors = {self.n_errors_compressing}
     -----------------------------------------
     begin_time = {self.begin_time}
@@ -349,7 +349,7 @@ class VideoCompressor:
     """
     print(scrmsg)
 
-  def get_quad_elapsed_avg_now_n_remaining_inbetween_compressions(self):
+  def get_triple_totalelapsed_avg_n_remaining_inbetween_compressions(self):
     """
     Returns a quadruple with:
       elapsed: the duration of last compression
@@ -358,31 +358,28 @@ class VideoCompressor:
       remaining_time: a prediction on how much time to go to complete processing
     :return: elapsed, average, now, remaining
     """
-    elapsed, average, now = get_triple_elapsed_avg_n_now_inbetween_compressions(
+    totalelapsed, average = get_totalelapsed_n_avg_inbetween_compressions(
       self.begin_time,
-      self.n_file_passing,
-      self.compress_marktime
+      self.n_videos_processed,
     )
-    self.compress_marktime = now
     # forecasting remaining time
-    remaining_videos = self.n_files_for_compression - self.n_videos_processed
-    remaining_time = remaining_videos * average
-    return elapsed, average, now, remaining_time
+    remaining_time = self.n_videos_yet_to_compress * average
+    return totalelapsed, average, remaining_time
 
   def process_command(self, filename):
     input_file_abspath = self.get_curr_input_file_abspath(filename)
     if not os.path.isfile(input_file_abspath):
-      self.n_files_not_existing_in_src += 1
-      numbering = (f"src-doesn't-exist={self.n_files_not_existing_in_src} | video={self.n_video_passing}"
-                   f" | total={self.n_files_for_compression}")
+      self.n_videos_not_existing_in_src += 1
+      numbering = (f"src-doesn't-exist={self.n_videos_not_existing_in_src} | video={self.n_video_passing}"
+                   f" | total={self.n_videos_for_compression}")
       scrmsg = f"{numbering} file {input_file_abspath} does not exist. Returing."
       print(scrmsg)
       return False
     output_file_abspath = self.get_curr_output_file_abspath(filename)
     if os.path.isfile(output_file_abspath):
-      self.n_files_existing_in_trg += 1
-      numbering = (f"trg-exists={self.n_files_existing_in_trg} | video={self.n_video_passing}"
-                   f" | total={self.n_files_for_compression}")
+      self.n_videos_existing_in_trg += 1
+      numbering = (f"trg-exists={self.n_videos_existing_in_trg} | video={self.n_video_passing}"
+                   f" | total={self.n_videos_for_compression}")
       scrmsg = f"{numbering} file [{output_file_abspath}] already exists. Not processing, returing."
       print(scrmsg)
       return False
@@ -400,13 +397,14 @@ class VideoCompressor:
       scrmsg = '-'*40
       print(scrmsg)
       scrmsg = (f"video={self.n_video_passing} | proc {self.n_videos_processed}"
-                f" | total {self.n_files_for_compression}"
-                f" filename {filename}")
+                f" | yet {self.n_videos_yet_to_compress} | total {self.n_videos_for_compression}"
+                f" | filename [{filename}]")
       print(scrmsg)
-      scrmsg = f"\tin folder {self.src_currdir_abspath}"
+      scrmsg = f"\tin folder [{self.src_currdir_abspath}]"
       print(scrmsg)
-      elapsed, average, now, remaining_time = self.get_quad_elapsed_avg_now_n_remaining_inbetween_compressions()
-      scrmsg = (f" \t{now} => times: last compression duration: {elapsed} secs"
+      totalelapsed, average, remaining_time = self.get_triple_totalelapsed_avg_n_remaining_inbetween_compressions()
+      now = datetime.datetime.now()
+      scrmsg = (f" \t{now} => total running time: {totalelapsed} secs"
                 f" | average duration until now: {average} secs"
                 f" | remaining_time: {remaining_time}")
       print(scrmsg)
@@ -414,7 +412,7 @@ class VideoCompressor:
       print(scrmsg)
       subprocess.run(cmd, check=True)
       self.n_videos_processed += 1
-      print(f"{self.n_videos_processed} / {self.n_file_passing} / {self.n_files_for_compression}"
+      print(f"{self.n_videos_processed} / {self.n_file_passing} / {self.n_videos_for_compression}"
             f" successfully compressed: {filename} -> {self.resolution_with_colon}")
       return True
     except subprocess.CalledProcessError:
@@ -424,7 +422,7 @@ class VideoCompressor:
       print(strline)
       logging.error(strline)
       errmsg = (f"Error compressing: errors: {self.n_errors_compressing} / visited: {self.n_file_passing}"
-                f" / total: {self.n_files_for_compression}")
+                f" / total: {self.n_videos_for_compression}")
       print(errmsg)
       logging.error(errmsg)
       errmsg = f"\terror compressing file/video: [{filename}]"
@@ -443,13 +441,13 @@ class VideoCompressor:
     if not os.path.isfile(input_file_abspath):
       self.n_videos_skipped += 1
       numbering = (f"not-copied={self.n_videos_skipped} | reached={self.n_file_passing}"
-                   f" | total={self.n_files_for_compression}")
+                   f" | total={self.n_videos_for_compression}")
       print(f"{numbering} | video file does not exist (or was moved out) in source.")
       return False
     if os.path.isfile(output_file_abspath):
       self.n_videos_skipped += 1
       numbering = (f"not-copied={self.n_videos_skipped} | reached={self.n_file_passing}"
-                   f" | total={self.n_files_for_compression}")
+                   f" | total={self.n_videos_for_compression}")
       print(f"{numbering} | video filename already exists in target.")
       return False
     try:
@@ -461,14 +459,14 @@ class VideoCompressor:
       print(strline)
       logging.error(strline)
       numbering = (f"failed_copy={self.n_failed_videos_copied_over} | reached={self.n_file_passing}"
-                   f" | total={self.n_files_for_compression}")
+                   f" | total={self.n_videos_for_compression}")
       errmsg = f"{numbering} | videopath = {input_file_abspath}) \n\tError = {e}"
       logging.error(errmsg)
       print(errmsg)
       return False
     self.n_videos_copied_over += 1
     numbering = (f"copied={self.n_videos_copied_over} | reached={self.n_file_passing}"
-                 f" | total={self.n_files_for_compression}")
+                 f" | total={self.n_videos_for_compression}")
     scrmsg = f"{numbering} (videos has already {self.resolution_with_colon})"
     print(scrmsg)
     return True
@@ -476,6 +474,10 @@ class VideoCompressor:
   def process_files_in_folder(self, files):
     for filename in files:
       self.n_file_passing += 1
+      numbering = (f"passing={self.n_file_passing} | videosprocessed={self.n_videos_processed}"
+                   f" | totalvideos={self.n_videos_for_compression} | totalfiles={self.total_files}")
+      scrmsg = f"{numbering} | visiting filename = {filename}"
+      print(scrmsg)
       if filename.endswith(tuple(self.compressable_dot_extensions)):
         self.n_video_passing += 1
         input_file_abspath = self.get_curr_input_file_abspath(filename)
@@ -493,7 +495,7 @@ class VideoCompressor:
       self.n_dir_passing += 1
       n_files_in_dir = len(files)
       scrmsg = (f"Visited dirs {self.n_dir_passing} | total dirs {self.n_dirs_for_compression} "
-                f"| processing {n_files_in_dir} videos in [{self.src_currdir_abspath}]")
+                f"| going to check {n_files_in_dir} files in [{self.src_currdir_abspath}]")
       print(scrmsg)
       self.process_files_in_folder(files)
 
@@ -501,11 +503,14 @@ class VideoCompressor:
     scrmsg = f""" =========================
     *** Confirmation needed
     Confirm the videocompressing with the following counts:
+      log_filepath    = {Log.log_filepath}
       source root dir = {self.src_rootdir_abspath}
       target root dir = {self.trg_rootdir_abspath}
       target extensions = {self.compressable_dot_extensions}
-      n_files_for_compression = {self.n_files_for_compression}
+      total_files       = {self.total_files}
       n_dirs_to_process = {self.n_dirs_for_compression}
+      n_videos_for_compression = {self.n_videos_for_compression}
+      n_videos_yet_to_compress = {self.n_videos_yet_to_compress}
     -----------------------
     [Y/n] ? [ENTER] means Yes
     """
@@ -515,27 +520,28 @@ class VideoCompressor:
     return False
 
   def count_grouped_files_under_video_extensions(self, files):
-    n_files_for_compression = 0
+    n_videos_for_compression = 0
     for filename in files:
       self.total_files += 1
       if filename.endswith(tuple(self.compressable_dot_extensions)):
-        n_files_for_compression += 1
-        scrmsg = f"{n_files_for_compression} counting, {self.n_files_for_compression} counted"
+        n_videos_for_compression += 1
+        scrmsg = f"{n_videos_for_compression} counting, {self.n_videos_for_compression} counted"
         print(scrmsg)
         scrmsg = f"{filename} in [{self.src_currdir_abspath}]"
         print(scrmsg)
-    return n_files_for_compression
+    return n_videos_for_compression
 
   def precount_dirs_n_files(self):
     print("Precounting dirs & files for videocompressing")
     print(f"looking and counting those with extensions: {self.compressable_dot_extensions}")
+    self.total_files = 0
     self.n_dirs_for_compression = 0
-    self.n_files_for_compression = 0
+    self.n_videos_for_compression = 0
     for self.src_currdir_abspath, _, files in os.walk(self.src_rootdir_abspath):
-      n_files = self.count_grouped_files_under_video_extensions(files)
-      if n_files > 0:
+      videos_for_compression_in_dir = self.count_grouped_files_under_video_extensions(files)
+      if videos_for_compression_in_dir > 0:
         self.n_dirs_for_compression += 1
-        self.n_files_for_compression += n_files
+        self.n_videos_for_compression += videos_for_compression_in_dir
 
   def process(self):
     """
@@ -620,9 +626,8 @@ def adhoc_test2():
   now = datetime.datetime.now()
   begin_time = datetime.datetime.now() - datetime.timedelta(hours=1)
   n_passing = 4
-  timemark = now
-  elapsed, avg, now = get_triple_elapsed_avg_n_now_inbetween_compressions(begin_time, n_passing, timemark)
-  scrmsg = f"elapsed={elapsed}, avg={avg}, now={now}, n_passing={n_passing}, begin={begin_time}"
+  totalelapsed, avg = get_totalelapsed_n_avg_inbetween_compressions(begin_time, n_passing)
+  scrmsg = f"totalelapsed={totalelapsed}, avg={avg}, now={now}, n_passing={n_passing}, begin={begin_time}"
   print(scrmsg)
 
 
