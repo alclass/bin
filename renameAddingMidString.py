@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# No longer need in Python3: -*- coding: utf-8 -*-
 """
 Usage:
 $renameAddingMidString.py -e=[<extension>] -p=[<pos>] -i="<string-to-be-added>"
@@ -15,7 +14,7 @@ Parameters:
 Example:
   renameCleanSpecifiedStr.py -e=pdf -i=" [John Surname]" -p=-1 -d="."
 
-With the example above, files such as (in the current folder, notice -d=".":
+With the example above, files such as (in the current folder), notice -d=".":
   "The book of science.pdf" & This book.pdf"
 will be renamed to:
   "The book of science [John Surname].pdf" & This book [John Surname].pdf"
@@ -33,8 +32,6 @@ renameAddingMidString.py
 # import glob
 import os
 import sys
-
-
 DEFAULT_EXTENSION = 'mp4'
 
 
@@ -53,7 +50,7 @@ def clean_emptystr_inlist(listin):
 
 class Renamer:
   """
-
+  Class Renamer acts as a "processor()", ie it organizes class variables and undergoes a process chain
   """
   
   def __init__(self, include_str, ext_list_as_str=None, pos=0, dir_abspath=None):
@@ -61,8 +58,9 @@ class Renamer:
     """
     self.rename_pairs = []
     self.is_renames_confirmed = False
-    if include_str is None or include_str == '' or type(include_str) != str:
-      error_msg = ' Error:\n Cannot continue without an include string.\n Please retry entering an include string.'
+    if include_str is None or not isinstance(include_str, str):
+      error_msg = (' Error:\n Cannot continue without an include string (parameter -i="<string>".'
+                   '\n Please retry entering an include string.')
       raise ValueError(error_msg)
     else:
       self.include_str = include_str
@@ -73,7 +71,7 @@ class Renamer:
     self.dir_abspath = None
     self.set_dir_abspath(dir_abspath)
 
-  def set_dir_abspath(self, dir_abspath):
+  def set_dir_abspath(self, dir_abspath: os.path.abspath):
     if dir_abspath is None or dir_abspath == '.':
       self.dir_abspath = os.path.abspath('.')
       return
@@ -223,7 +221,10 @@ def get_args():
   include_str = None
   folder_abspath = None
   for arg in sys.argv:
-    if arg.startswith('-e='):
+    if arg == '-h' or arg.startswith('--help'):
+      print(__doc__)
+      sys.exit(0)
+    elif arg.startswith('-e='):
       ext_list_as_str = arg[len('-e='):]
     elif arg.startswith('-p='):
       pos = arg[len('-p='):]
