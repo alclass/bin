@@ -2,7 +2,7 @@
 """
 pyVideoPostCompressMoverNDeleter.py
 
-What does script does?
+What does script do?
 ======================
 
 This script is aimed to be used after the compression script
@@ -10,61 +10,70 @@ This script is aimed to be used after the compression script
   which only compresses video files from one dirtree (source) to another (target)
   and does not move the other accompanying files to the target dirtree.
 
-After compressing, two (maybe three) actions are necessary, ie:
+The ffmpeg compressor also does not copy the os-dates metadata
+  to the compressed files.  This script also recovers that in chosen in the parametes.
 
-  1 as a completion act, all non compressed files (textfiles, audiofiles etc.)
+After compressing, two (maybe three) actions are necessary, i.e.:
+
+  1. as a completion act, all non-compressed files (textfiles, audiofiles, etc.)
     should be moved from source to target
 
-  2 (optional) the ffmpeg compression process does not carry the OS dates
+  2. (optional) the ffmpeg compression process does not carry the OS dates
     to the compressed files, so it might be done, if chosen,
     before the next action below (deletion)
 
-  3 all larger videofiles that were compressed may now be deleted
-    (this action should be done with care [it's an undo operation],
-     some manual inspection of the compressed files
-     would help deciding whether or not to delete these source larger videofiles)
+  3. all larger videofiles that were previously compressed
+    may now be deleted
+    (this action should be done with caution [there's no undo operation],
+     some manual inspection by the user (outside this script)
+       of the compressed files
+     would help decide whether to delete these source
+       larger videofiles)
 
-  The end result (after compress and this post-compression) is to have a copy
+  The result (after compress and this post-compression) is to have a copy
     of the original dirtree with the videofiles compressed
 
 Usage:
-=========
+======
 
 $pyVideoPostCompressMoverNDeleter.py --input-dir <source_dirtree_abspath>
-   --output-dir <tareget_dirtree_abspath> [--mc]  [--dc]
+   --output-dir <tareget_dirtree_abspath> [--ed] [--mc] [--dc]
 
 Where:
 
   --dc => means "delete (those) compressed",
           ie delete files that have their compressed counterparts in the target dirtree
-           (for deletion, user confirmation is required)
+           (for this batch deletion, one user confirmation is required)
   --ed => means "equalize os-dates",
-          ie delete files that have their compressed counterparts in the target dirtree
+          copystat() the metadata in the source videofiles to the target previously compressed ones
   --mc => means "move complement",
-          ie all complementing files are queued to be move to the target dirtree
+          ie all complementing files (*) are moved to the target dirtree
+            (*) complementing files are all files not having the video file extensions
 
 Order of use of the parameters
 ==============================
 
   One particular case should be mentioned:
 
-  --ed must be used before --dc,
+  --ed must be used in a separe run before --dc,
     because --dc will delete the source videofiles and
-    then, if so, --ed will not have the os-date metadata
-    to copy over to the target videofiles
+    then, if so, --ed will not have (because they were deleted)
+    the os-date metadata to copy over to the target videofiles
 
 Example Usage
 ==============
 
-  ex1 $pyVideoPostCompressMoverNDeleter.py --input-dir "/media/user/disk1/Science/Physics"
-   --output-dir "/media/user/disk2/Science/Physics"  --ed --cm
+  Ex1 $pyVideoPostCompressMoverNDeleter.py --input-dir "/media/user/disk1/Science/Physics"
+   --output-dir "/media/user/disk2/Science/Physics" --ed --mc
 
-  ex2 $pyVideoPostCompressMoverNDeleter.py --input-dir "/media/user/disk1/Science/Physics"
-   --output-dir "/media/user/disk2/Science/Physics"  --dc
+  Ex2 $pyVideoPostCompressMoverNDeleter.py --input-dir "/media/user/disk1/Science/Physics"
+   --output-dir "/media/user/disk2/Science/Physics" --dc
 
-  In the first example, os-dates will be equalized and all complementing files will be moved over the target dirtree
+  In the first example, os-dates will be equalized and all complementing files
+    will be moved over the target dirtree
 
-  In the second example, larger videofiles that were compressed will be deleted (user confirmation is required)
+  In the second example, larger videofiles that were (previously) compressed
+     will be deleted (a one-time user confirmation is required)
 
 """
 import argparse
@@ -75,6 +84,9 @@ import shutil
 import subprocess
 import sys
 import time
+
+from jinja2.filters import do_mark_unsafe
+
 DEFAULT_RESOLUTION_WIDTH_HEIGHT = (256, 144)  # 256:144
 DEFAULT_COMPRESSABLE_DOT_EXTENSIONS = [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".m4v"]
 ACCEPTED_RESOLUTIONS = [(256, 144), (426, 240), (640, 360), (854, 480), (1280, 720)]
@@ -172,30 +184,33 @@ def get_actual_video_resolution_of(video_path):
   return None, None
 
 
-class VideoCompressor:
+class FileMoveNDeleterFromToDirTree:
 
   compressable_dot_extensions = DEFAULT_COMPRESSABLE_DOT_EXTENSIONS
 
-  def __init__(self, src_rootdir_abspath, trg_rootdir_abspath, resolution_tuple):
+  def __init__(
+      self, src_rootdir_abspath, trg_rootdir_abspath,
+      do_move=True, replicate_osdates=False, delete_if_compressed=False,
+  ):
     self.src_rootdir_abspath = src_rootdir_abspath  # source root directory (or scrdirtree) abspath
     self.trg_rootdir_abspath = trg_rootdir_abspath  # target root directories (or trgdirtree) abspath
-    self.resolution_tuple = resolution_tuple
+    self.do_move = do_move
+    self.replicate_osdates = replicate_osdates
+    self.delete_if_compressed = delete_if_compressed
     self.treat_params()
     self.src_currdir_abspath = None  # its trg equivalent is a class property (i.e., dynamically found)
     self.total_files = 0
     self.n_file_passing = 0  # counts each file coming up via os.walk()
     self.n_video_passing = 0  # counts each file that has the eligible video extensions (mp4, mkv, etc.)
     self.n_dir_passing = 0  # counts each directory coming up via os.walk()
-    self.n_videos_processed = 0  # counts video processed
-    self.n_videos_skipped = 0  # counts videofiles skipped (either because they were not found or exist in target)
-    self.n_videos_copied_over = 0  # counts videos that have already the same target resolution (the copied over)
-    self.n_failed_videos_copied_over = 0  # counts failed copies-over
-    self.n_videos_existing_in_trg = 0  # counts videofiles that exist in target
-    self.n_videos_not_existing_in_src = 0  # counts videofiles that don't exist in the source (were moved out?)
-    self.n_errors_compressing = 0  # counts when exception subprocess. is raised
-    self.n_videos_for_compression = 0  # counts ffmpeg commands gone to completion
-    self.n_dirs_for_compression = 0  # counts total directories that have videos for compression
-    self.compress_timemark = datetime.datetime.now()  # marks time at a videocompression, helps in duration averaging
+    self.n_dirs_for_reaching = 0
+    self.n_files_moved_over = 0
+    self.n_videos_out_of_files = 0
+    self.n_files_metadata_recovered = 0  # originally, the metadata recovery is aimed at videos previously compressed
+    self.n_failed_files_moved_over = 0
+    self.n_failed_file_deletes = 0
+    self.n_files_not_existing_in_src = 0  # counts videofiles that don't exist in the source (were moved out?)
+    self.n_files_not_existing_in_trg = 0  # counts videofiles that don't exist in the source (were moved out?)
     self.begin_time = datetime.datetime.now()  # it marks script's begintime
     self.end_time = None  # will mark script's endtime at the report calling time
 
@@ -452,23 +467,140 @@ class VideoCompressor:
     print(scrmsg)
     return True
 
+  def is_file_by_extension_eligible_to_move(self, filename):
+    if filename.endswith(tuple(self.compressable_dot_extensions)):
+      return False
+    return True
+
+  def move_files_from_to_dirtrees(self, filename):
+    """
+    Moves files from the source dirtree to the destination dirtree
+    This method is called if self.do_move is True
+
+    :param filename:
+    :return: bool_moved_occurred: boolean
+    """
+    if not self.is_file_by_extension_eligible_to_move(filename):
+      # the file is not eligible for moving because it's a video looked up for compression
+      return False
+    numbering = (f"passing={self.n_file_passing} | videosprocessed={self.n_videos_processed}"
+                 f" | totalvideos={self.n_videos_for_compression} | totalfiles={self.total_files}")
+    scrmsg = f"{numbering} | visiting filename = {filename}"
+    print(scrmsg)
+    input_file_abspath = self.get_curr_input_file_abspath(filename)
+    output_file_abspath = self.get_curr_output_file_abspath(filename)
+    if not os.path.isfile(input_file_abspath):
+      self.n_videos_skipped += 1
+      numbering = (f"not-copied={self.n_videos_skipped} | reached={self.n_file_passing}"
+                   f" | total={self.n_videos_for_compression}")
+      print(f"{numbering} | video file does not exist (or was moved out) in source.")
+      return False
+    if os.path.isfile(output_file_abspath):
+      self.n_videos_skipped += 1
+      numbering = (f"not-copied={self.n_videos_skipped} | reached={self.n_file_passing}"
+                   f" | total={self.n_videos_for_compression}")
+      print(f"{numbering} | video filename already exists in target.")
+      return False
+    try:
+      shutil.move(input_file_abspath, output_file_abspath)
+      return True
+    except (OSError, IOError) as e:
+      # logging and printing the error context
+      self.n_failed_files_moved_over += 1
+      strline = "-" * 35
+      print(strline)
+      logging.error(strline)
+      numbering = (f"failed_copy={self.n_failed_videos_copied_over} | reached={self.n_file_passing}"
+                   f" | total={self.n_videos_for_compression}")
+      errmsg = f"{numbering} | videopath = {input_file_abspath}) \n\tError = {e}"
+      logging.error(errmsg)
+      print(errmsg)
+      return False
+
+  def was_chosen_complementary_move(self, filename):
+    if not self.do_move:
+      return False
+    return self.move_files_from_to_dirtrees(filename)
+
+  def was_chosen_videofile_metadata_recuperation(self, filename):
+    """
+
+    :param filename:
+    :return:
+    """
+    if not self.do_recuperate_metadata:
+      return False
+    return self.recuperate_metadata(filename)
+
+  def delete_files_in_queue(self):
+    for seq, filepath in enumerate(self.files_deletion_queue):
+      try:
+        os.remove(filepath)
+        self.n_deleted += 1
+        scrmsg = f"\tDeleting {self.n_deleted} | {seq} | file=[{filepath}]"
+        print(scrmsg)
+      except (OSError, IOError) as e:
+        # logging and printing the error context
+        self.n_failed_delete += 1
+        strline = "-" * 35
+        print(strline)
+        logging.error(strline)
+        numbering = (f"failed_delete={self.n_failed_delete} | reached={self.n_file_passing}"
+                     f" | totalfiles={self.n_total_files}")
+        errmsg = f"{numbering} | videopath = {target_file_abspath}) \n\tError = {e}"
+        logging.error(errmsg)
+        print(errmsg)
+
+  def queue_up_target_file_for_later_deletion(self, filename):
+    """
+    Deletes files in the destination that also namewise exist in the source,
+      i.e., what matters is the mere filename presence,
+      a hash or any content checking is not done
+
+    Use this method with caution, for the deletes cannot be undoned
+
+    The rationale here is to delete videofiles that have been previously compressed.
+    Because a quality check of the compress is still not developed,
+      the ideal is that the user may have taken a sampling inspection of the compressed videos
+
+    :param filename:
+    :return:
+    """
+    # input_file_abspath = self.get_curr_input_file_abspath(filename)
+    target_file_abspath = self.get_curr_output_file_abspath(filename)
+    if not os.path.isfile(target_file_abspath):
+      self.n_files_not_deleted += 1
+      numbering = (f"not-deletedd={self.n_files_not_deleted} | reached={self.n_file_passing}"
+                   f" | total={self.n_videos_for_compression}")
+      print(f"{numbering} | video file does not exist (or was moved out) in source.")
+      return False
+    try:  # copy this part to the real delete method
+      # os.remove(target_file_abspath)
+      self.files_deletion_queue.append(target_file_abspath)
+      return True
+    except (OSError, IOError) as e:
+      # logging and printing the error context
+      self.n_failed_delete += 1
+      strline = "-"*35
+      print(strline)
+      logging.error(strline)
+      numbering = (f"failed_delete={self.n_failed_delete} | reached={self.n_file_passing}"
+                   f" | totalfiles={self.n_total_files}")
+      errmsg = f"{numbering} | videopath = {target_file_abspath}) \n\tError = {e}"
+      logging.error(errmsg)
+      print(errmsg)
+      return False
+
+  def was_chosen_delete_previously_processed_videofile(self, filename):
+    if not self.do_delete_prev_proc_videofile:
+      return False
+    return self.queue_up_target_file_for_later_deletion(filename)
+
   def process_files_in_folder(self, files):
     for filename in files:
-      self.n_file_passing += 1
-      numbering = (f"passing={self.n_file_passing} | videosprocessed={self.n_videos_processed}"
-                   f" | totalvideos={self.n_videos_for_compression} | totalfiles={self.total_files}")
-      scrmsg = f"{numbering} | visiting filename = {filename}"
-      print(scrmsg)
-      if filename.endswith(tuple(self.compressable_dot_extensions)):
-        self.n_video_passing += 1
-        input_file_abspath = self.get_curr_input_file_abspath(filename)
-        # Check video resolution
-        width, height = get_actual_video_resolution_of(input_file_abspath)
-        if width == self.target_width and height == self.target_height:
-          # resolution is already the aimed one, copy videofile over to destination dirtree
-          _ = self.copy_over_file_to_trg(filename)  # returns a boolean
-          continue
-        _ = self.process_command(filename)  # returns a boolean
+      self.was_chosen_complementary_move(filename)
+      self.was_chosen_videofile_metadata_recuperation(filename)
+      self.was_chosen_delete_previously_processed_videofile(filename)
 
   def process_in_oswalk(self):
     self.n_file_passing = 0
@@ -516,36 +648,22 @@ class VideoCompressor:
     print("Precounting dirs & files for videocompressing")
     print(f"looking and counting those with extensions: {self.compressable_dot_extensions}")
     self.total_files = 0
-    self.n_dirs_for_compression = 0
-    self.n_videos_for_compression = 0
+    self.n_dirs_for_reaching = 0
+    self.n_videos_out_of_files = 0
     for self.src_currdir_abspath, _, files in os.walk(self.src_rootdir_abspath):
-      videos_for_compression_in_dir = self.count_grouped_files_under_video_extensions(files)
+      n_videos_out_of_files = self.count_grouped_files_under_video_extensions(files)
       if videos_for_compression_in_dir > 0:
-        self.n_dirs_for_compression += 1
-        self.n_videos_for_compression += videos_for_compression_in_dir
+        self.n_dirs_for_reaching += 1
+        self.n_videos_out_of_files += n_videos_out_of_files
 
   def process(self):
     """
-    Process videos in all directories using os.walk()
 
-    Class process chain:
-      1) before start processing, count all directories & files eligible for videocompressing
-        1-1 so that, on starting each videofile compression,
-            a screen message will inform n_processed / n_iterated / total
-        1-2 the triple mentioned above is:
-            n_process is number of videos compressed
-            n_iterated is number of files looped over
-            total is the total number of eligible files (videos having the target file-extensions)
-      2) confirm/allow starting of videocompressing with the numbers counted above
-        i.e., the user wants to proceed with the numbers collected?
-      3) process videocompressing
-        video compression is done by the underlying ffmpeg OS tool (so it must be available)
-      4) output final processing report
     """
     self.precount_dirs_n_files()
-    if not self.confirm_videoprocessing_with_the_counting():
-      return False
     self.process_in_oswalk()
+    if not self.confirm_queued_files_deletion():
+      return False
     self.show_final_report()
     return True
 
@@ -629,8 +747,8 @@ def process():
   Log.start_logging()
   confirmed, src_rootdir_abspath, trg_rootdir_abspath, resolution_tuple = confirm_cli_args_with_user()
   if confirmed:
-    vcompressor = VideoCompressor(src_rootdir_abspath, trg_rootdir_abspath, resolution_tuple)
-    vcompressor.process()
+    moveretc = FileMoveNDeleterFromToDirTree(src_rootdir_abspath, trg_rootdir_abspath, resolution_tuple)
+    moveretc.process()
     return True
   logging.shutdown()
   return False
