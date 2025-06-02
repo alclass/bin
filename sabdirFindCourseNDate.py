@@ -14,12 +14,16 @@ Example:
 
 Output (at this moment's version, a list with coursenames and their dates will be printed out)
 
-  TO-DO: improve this script adding other forms of output (file, database, spreadsheet etc.)
+  TO-DO: improve this script adding other forms of output (file, database, spreadsheet, etc.)
 """
+import copy
 import datetime
 import os
 import argparse
 import re
+import sys
+# sys.path.insert('.')
+import localuserpylib.pydates.localpydates as lpd  # module where gen_last_n_monday_dates() resides
 
 parser = argparse.ArgumentParser(description="Walk a dirtree to find SabDir course dates.")
 parser.add_argument("--rootdir", type=str, default=None,
@@ -27,21 +31,6 @@ parser.add_argument("--rootdir", type=str, default=None,
 parser.add_argument("--nlist", type=int, default=50,
                     help="number of courses to list in descending alphabetical order")
 args = parser.parse_args()
-
-
-def gen_last_n_monday_dates(n=50):
-  today = datetime.date.today()
-  # take today as monday until proven contrary
-  monday_date = today
-  weekday = today.isoweekday()
-  if weekday > 1:
-    minus_days = weekday - 1
-    monday_date = today - datetime.timedelta(days=minus_days)
-  # yields the last n monday dates
-  for i in range(n):
-    yield monday_date
-    monday_date = monday_date - datetime.timedelta(days=7)
-  return
 
 
 class SabDirCourse:
@@ -63,6 +52,7 @@ class SabDirCourseOSWalkFinder:
 
   def __init__(self, rootdir_abspath, nlist=None):
     self.rootdir_abspath = rootdir_abspath
+    self.currentdir_abspath = None
     self.courses = []
     self.course_infofile_found = 0
     self.n_course = 0
@@ -115,17 +105,52 @@ class SabDirCourseOSWalkFinder:
   def process(self):
     self.walk_dir_up()
 
-  def gen_last_ncourses_by_descending_date(self, n=50):
-    tuplelist = []
-    for sabdircourse in self.courses:
-      t = (sabdircourse.coursedate, sabdircourse.coursename)
-      tuplelist.append(t)
-    tuplelist.sort(key=lambda k: k[0])
-    for i in range(n):
-      t = tuplelist.pop()
-      sabdircourse = SabDirCourse(coursename=t[1], coursedate=t[0])
-      yield sabdircourse
+  def gen_last_ncourses_by_descending_date(self, alternative_nlist: int = None):
+    """
+    Generates the last n (self.nlist) courses in descending date order
+    :return:
+    """
+    # tuplelist = []
+    # for sabdircourse in self.courses:
+    #   t = (sabdircourse.coursedate, sabdircourse)
+    #   tuplelist.append(t)
+    # ==========
+    # a copy is to avoid changing the original order of self.courses
+    if alternative_nlist is None:
+      nlist = self.nlist
+    else:
+      nlist = alternative_nlist
+    courses_copied = copy.copy(self.courses)
+    courses_copied.sort(key=lambda course: course.coursedate, reverse=True)
+    nelems = nlist if nlist <= len(courses_copied) else len(courses_copied)
+    for i in range(nelems):
+      # t = tuplelist.pop()
+      # sabdircourse = t[1]
+      yield courses_copied[i]
+    del courses_copied
     return
+
+  def find_course_on_date(self, pdate):
+    resultlist = list(filter(lambda c: c.coursedate == pdate, self.courses))
+    if len(resultlist) == 1:
+      return resultlist[0]
+    return None
+
+  def report_missing_mondays_in_sabdircourses(self):
+    courses_copied = copy.copy(self.courses)
+    courses_copied.sort(key=lambda course: course.coursedate, reverse=True)
+    # now the last course in a list (courses_copied) is the oldest in date
+    nelems = len(courses_copied)
+    oldest_course = courses_copied[nelems-1]
+    oldest_coursedate = oldest_course.coursedate
+    for pdate in lpd.gen_all_mondays_inbetweenfrom(oldest_coursedate, ascending_order=False):
+      sabdircourse = self.find_course_on_date(pdate)
+      if sabdircourse:
+        scrmsg = f"The is a course on {pdate} | {sabdircourse}"
+        print(scrmsg)
+      else:
+        scrmsg = f"The is NOT a course on {pdate}"
+        print(scrmsg)
 
 
 def get_cli_args():
@@ -150,7 +175,11 @@ def get_cli_args():
 
 
 def adhoc_test():
-  for i, sdate in enumerate(gen_last_50_monday_dates()):
+  """
+  Example for an adhoc test:
+    --rootdir="/home/dados/VideoAudio/Soc vi/Law vi/BRA Dir vi/Sab Dir vi/completed Sab Dir ytvi"
+  """
+  for i, sdate in enumerate(lpd.gen_last_n_monday_dates()):
     print(i, sdate)
 
 
@@ -161,6 +190,7 @@ def process():
   for i, t in enumerate(finder.gen_last_ncourses_by_descending_date()):
     seq = i + 1
     print(seq, t)
+  finder.report_missing_mondays_in_sabdircourses()
 
 
 if __name__ == '__main__':
