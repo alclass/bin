@@ -152,6 +152,39 @@ class SabDirCourseOSWalkFinder:
         scrmsg = f"The is NOT a course on {pdate}"
         print(scrmsg)
 
+  def find_courses_date_by_first_lecture_filedate(self):
+    """
+
+    Useful functions
+      os.path.getctime(file_path):
+        Gets the creation time (or last metadata change time on some systems) as seconds since the epoch.
+      os.path.getatime(file_path):
+        Gets the last access time as seconds since the epoch.
+      os.stat(file_path):
+        Returns a stat object containing various file metadata, including timestamps as attributes
+          like st_mtime, st_ctime, and st_atime.
+      datetime.datetime.fromtimestamp(timestamp):
+        Converts the timestamp into a datetime object for more flexible formatting.
+
+    :return:
+    """
+    # step 1: find the file that corresponds to lecture 1 (_Aula 1)
+    filenames = os.listdir(self.currentdir_abspath)
+    filename = None
+    for filename in filenames:
+      if filename.find('_Aula 1') > -1:
+        # got it
+        break
+    if filename is None:
+      return None
+    file_abspath = os.path.join(self.currentdir_abspath, filename)
+    files_ctime = os.path.getctime(file_abspath)
+    mondaydate = lpd.get_nearest_monday_from(files_ctime)
+    return mondaydate
+
+  def create_zinfofile_if_not_exists(self):
+    pass
+
 
 def get_cli_args():
   """
