@@ -23,24 +23,67 @@ import argparse
 import re
 import sys
 # sys.path.insert('.')
-import localuserpylib.pydates.localpydates as lpd  # module where gen_last_n_monday_dates() resides
+import localuserpylib.pydates.localpydates as lpd  # module where gen_last_n_monday_dates_from_today() resides
+
+
+def list_help_n_exit():
+  """
+
+  :return:
+  """
+  print(__doc__)
+  sys.exit(0)
+
 
 parser = argparse.ArgumentParser(description="Walk a dirtree to find SabDir course dates.")
 parser.add_argument("--rootdir", type=str, default=None,
                     help="Directory from which to walk up directory to find SabDir course dates")
 parser.add_argument("--nlist", type=int, default=50,
                     help="number of courses to list in descending alphabetical order")
+parser.add_argument("--help", function=list_help_n_exit,
+                    help="print help and exist")
 args = parser.parse_args()
 
 
 class SabDirCourse:
 
-  def __init__(self, coursename, coursedate=None):
+  zinfofilename = "z-info.txt"
+
+  def __init__(
+      self, coursename: str, coursedate: datetime.date = None,
+      instructor_fullname: str = None, instructor: str = None, n_lectures=5
+    ):
     self.coursename = coursename
     self.coursedate = coursedate
+    self.instructor_fullname = instructor_fullname
+    self._instructor = instructor
+    self.n_lectures = n_lectures
+
+  @property
+  def instructor(self):
+    if self._instructor is not None:
+      return self._instructor
+    if self.instructor_fullname is None:
+      return 's/inf'
+    pp = self.instructor_fullname.split(' ')
+    first_n_last = pp[0] + ' ' + pp[-1]
+    return first_n_last
+
+  def create_zinfofile_if_not_exists(self, courses_folderpath):
+    text = f"{self.coursename} _i {self.instructor}\n"
+    text += f"fullname: s/inf"
+    text += f"female: s/inf"
+    text += f"{self.coursedate}"
+    filepath = os.path.join(courses_folderpath, self.zinfofilename)
+    if os.path.exists(filepath):
+      return False
+    fd = open(filepath, 'w')
+    fd.write(text)
+    fd.close()
+    return False
 
   def __str__(self):
-    outstr = f"{self.coursedate} | {self.coursename}"
+    outstr = f"{self.coursedate} | {self.coursename} | {self.instructor}"
     return outstr
 
 
@@ -52,6 +95,12 @@ class SabDirCourseOSWalkFinder:
 
   def __init__(self, rootdir_abspath, nlist=None):
     self.rootdir_abspath = rootdir_abspath
+    if os.path.isdir(self.rootdir_abspath):
+      errmsg = (
+        f"Error: directory {self.rootdir_abspath} does not exist."
+        f" Please, access the docstring help via parameters -h or --help"
+      )
+      raise OSError(errmsg)
     self.currentdir_abspath = None
     self.courses = []
     self.course_infofile_found = 0
@@ -96,10 +145,13 @@ class SabDirCourseOSWalkFinder:
       _, foldername = os.path.split(self.currentdir_abspath)
       pos = foldername.find(' _i ')
       if pos > -1:
-        coursename = foldername[: pos]
+        pp = foldername.split(' _i ')
+        # coursename = foldername[: pos]
+        coursename = pp[0].strip(' ')
+        instructor = pp[1].strip(' ')
         self.n_course += 1
-        print(self.n_course, '@', coursename)
-        sabdircourse = SabDirCourse(coursename)
+        sabdircourse = SabDirCourse(coursename, instructor)
+        print(self.n_course, sabdircourse)
         self.introspect_courses_folder_for_info(sabdircourse)
 
   def process(self):
@@ -179,11 +231,10 @@ class SabDirCourseOSWalkFinder:
       return None
     file_abspath = os.path.join(self.currentdir_abspath, filename)
     files_ctime = os.path.getctime(file_abspath)
-    mondaydate = lpd.get_nearest_monday_from(files_ctime)
+    files_cdatetime = datetime.datetime.fromtimestamp(files_ctime)
+    mondaydate = lpd.get_nearest_monday_from(files_cdatetime)
     return mondaydate
 
-  def create_zinfofile_if_not_exists(self):
-    pass
 
 
 def get_cli_args():
@@ -212,7 +263,7 @@ def adhoc_test():
   Example for an adhoc test:
     --rootdir="/home/dados/VideoAudio/Soc vi/Law vi/BRA Dir vi/Sab Dir vi/completed Sab Dir ytvi"
   """
-  for i, sdate in enumerate(lpd.gen_last_n_monday_dates()):
+  for i, sdate in enumerate(lpd.gen_last_n_monday_dates_from_today()):
     print(i, sdate)
 
 
