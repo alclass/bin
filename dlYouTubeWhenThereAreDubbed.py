@@ -9,28 +9,66 @@ This script accepts the following input:
   1  it receives as input a youtube-video-id (ytid)
   2  it also receives the codes for languages (it does not discover them, the user has to enter them)
      obs: as far as we've observed, these codes are not standardized,
-          for example, in general, a video that is dubbed into English
-            has a sufix "-0" added to its audiocode, but if the original audio is English,
-              it seems undeterminate what sufix will be given to it
+          for example, in general, a video that is autodubbed into English
+            has sufix "-0" added to its audiocode (example: 233-0 or 234-0),
+            but if the original audio is already English,
+            it seems undeterminate what "dash-number" the system will give to it
+            (example: it might be a "-7", or a "-8" or a "-9"
+              (the user would have to find and enter it via the audiocodes parameter),
+              asking the API [something not done here] could make this known)
+            On the other hand, what seems stable is when English is autodubbed
+              so it gets the "-0" annexed to the audiocode and the original language an "-1"
+              (example: 233-0 English and 233-1 the original other language)
 
-This script downloads the video-only chunk only once and copies it to each new language.
+This script downloads the video-only part exactly once and copies it to each new language.
+This saves transfer bytes and redownload times.
+
 For example,
   1 suppose a video id as <videoid>
-  2 suppose also that video code 160 is available
-  3 suppose also that audio codes are available in dubbed Italian (as 233-5) and the original English (as 233-9)
+  2 suppose also that videocode 160 is available
+  3 suppose also that audio codes are available in dubbed Italian (as 233-5) and in the original English (as 233-9)
 
 Then, this script will:
   1st download the 160 video
   2nd copy it once because one will be used for Italian, the other for English
-  3rd download the 160+233-5 video (the dubbed Italian)
-  4th download the 160+233-9 video (the original English)
+  3rd download the 160+233-5, yt-dlp recognizes that the video is present and proceeds to download the audio "it" part
+  4th download the 160+233-9, idem for "en"
 
-Limitation: This scripts does not do (at least yet):
+An example of language audiocodes, having English as the original,
+    used for one of the channels we've seen (notice that this pattern may not be a general one):
+
+  233-0  mp4 audio only    m3u8 [de-DE] Deutsch (Deutschland) - dubbed-auto
+  233-1  mp4 audio only    m3u8 [es-US] es-US - dubbed-auto
+  233-2  mp4 audio only    m3u8 [fr-FR] Français (France) - dubbed-auto
+  233-3  mp4 audio only    m3u8 [hi] हिन्दी - dubbed-auto
+  233-4  mp4 audio only    m3u8 [id] Indonesia - dubbed-auto
+  233-5  mp4 audio only    m3u8 [it] Italiano - dubbed-auto
+  233-6  mp4 audio only    m3u8 [ja] 日本語 - dubbed-auto
+  233-7  mp4 audio only    m3u8 [pl] polski - dubbed-auto
+  233-8  mp4 audio only    m3u8 [pt-BR] Português (Brasil) - dubbed-auto
+  233-9  mp4 audio only    m3u8 [en-US] American English - original (default)
+
+An example of language audiocodes, having Portuguese as the original,
+    used for one of the channels:
+
+  233-0  mp4 audio only    m3u8 [en-US] American English - original (default)
+  233-1  mp4 audio only    m3u8 [pt-BR] Português (Brasil) - dubbed-auto
+
+This second case (where English is autodubbed) seems more stable in terms of standardized audiocodes.
+The first case (where English is original) seems to differ a little but enough to "miss the point".
+  The user has to use the audiocodes parameter to tell the correct audiocodes.
+  A programatic discovery via yt-dlp might be done, but as of yet this is not performed by this script.
+
+Notice that in the first example above, the original English is 233-9 and, in the second, English autodubbed, it's 233-0
+
+Limitation: what does this script not do (at least yet)?
+
   1 it doesn't discover the language codes, even less which codes are available at all
-    (the user enters those)
-  2 it may not be able to check all problems from the command line, but if subprocess returns with 0,
+    (the user enters those, this could be a TODO here for these codes are given with the parameter -F in yt-dlp)
+  2 it may not be able to check all problems from the command line, but if subprocess returns 0,
     it's a good sign that both the network is working and videos are complete
-    if subprocess does not return with 0, a message will be printed out indicating the error
+    if subprocess does not return with 0, a message will be printed out indicating the error,
+      but at the time of writing, it just a print-out, the program continues
 """
 import argparse
 import os.path
@@ -129,7 +167,7 @@ class Downloader:
     self.treat_input()
     self.b_verified_once_tmpdir_abspath = None
     self.video_canonical_filename = None  # this is the video filename with the f-sufix, it's known after download
-    self.audio_first_filepath = None
+    self.fixed_videoonlyfilename = None
     self.n_on_going_lang = 0
 
   def treat_input(self):
@@ -140,18 +178,25 @@ class Downloader:
       self.videoonlycode = self.DEFAULT_VIDEO_ONLY_CODE
 
   @property
-  def canonical_video_filepath(self):
+  def fixed_videoonlyfilepath(self):
+    return os.path.join(self.child_tmpdir_abspath, self.fixed_videoonlyfilename)
+
+  @property
+  def video_canonical_filepath(self):
     return os.path.join(self.child_tmpdir_abspath, self.video_canonical_filename)
 
   def get_video_or_audio_filename_with_bksufix(self, n_for_bksufix):
     """
     Example:
-      a-videofilename-ytid.mp4.bk3
-      bk3 means that it is the 3rd copy of a-videofilename-ytid.mp4
+      a-videofilename-ytid.f160.mp4.bk3
+      bk3 means that it is the 3rd copy of a-videofilename-ytid.f160.mp4
         and is to be used to complement the 3rd audio language file
+
+      Notice that pre-sufix f160 in the example above is a videoonly sufix coming before the extension,
+        this latter sufix is a different one and is nicknamed fsufix
     """
     bksufix = f".bk{n_for_bksufix}"
-    videofilename_w_bksufix = self.video_canonical_filename + bksufix
+    videofilename_w_bksufix = self.fixed_videoonlyfilename + bksufix
     return videofilename_w_bksufix
 
   def get_video_or_audio_filename_with_fsufix(self, fsufix):
@@ -178,11 +223,22 @@ class Downloader:
     url = self.video_baseurl.format(**pdict)
     return url
 
-  def form_bksufixed_videofilepath_basedonthecanonical(self, nth) -> os.path:
-    bksufix = f".bk{nth}"
-    folderpath, filename = os.path.split(self.canonical_video_filepath)
-    next_filename = filename + bksufix
-    return os.path.join(folderpath, next_filename)
+  def form_bksufixed_videofilepath_basedonthefsufixvideo(self, nth) -> os.path:
+    """
+    An example this method does the following: it takes a fsufix video, say:
+      a) filename.f160.mp4 (in the example this is self.fixed_videoonlyfilename)
+    and appends to it a bksufix, say:
+      b) filename.f160.mp4.bk2
+
+    Notice that the forming also considers the dirpath, in a nutshell, the forming is:
+      a) INPUT: <dirabspath>/filename.f160.mp4
+      b) OUTPUT: <dirabspath>/filename.f160.mp4.bk2
+    :param nth:
+    :return:
+    """
+    dot_bksufix = f".bk{nth}"
+    next_filename = self.fixed_videoonlyfilename + dot_bksufix
+    return os.path.join(self.child_tmpdir_abspath, next_filename)
 
   def copy_n_rename_videoonly_n_lang_times(self):
     """
@@ -195,19 +251,42 @@ class Downloader:
     if self.n_langs > 1:
       for i in range(1, self.n_langs):
         lang_seq = i + 1
-        trg_filepath = self.form_bksufixed_videofilepath_basedonthecanonical(lang_seq)
-        shutil.copy2(self.canonical_video_filepath, trg_filepath)
         audiocode = self.audioonlycodes[lang_seq-1]
+        trg_filepath = self.form_bksufixed_videofilepath_basedonthefsufixvideo(lang_seq)
+        if os.path.isfile(trg_filepath):
+          scrmsg = f"""lang={lang_seq} audiocode={audiocode}
+           fixed_videoonlyfilename =  {self.fixed_videoonlyfilename}
+           HAS ALREADY BEEN COPIED (for complementing later on) to {trg_filepath}"""
+          print(scrmsg)
+          continue
+        shutil.copy2(self.fixed_videoonlyfilepath, trg_filepath)
         scrmsg = f"""lang={lang_seq} audiocode={audiocode}
-         canonical_video_filepath =  {self.canonical_video_filepath}
-         copied (for complementing later on) to {trg_filepath}"""
+         fixed_videoonlyfilename =  {self.fixed_videoonlyfilename}
+         COPIED (for complementing later on) to {trg_filepath}"""
         print(scrmsg)
     # rename "bk1" at last
     lang_seq = 1
-    trg_filepath = self.form_bksufixed_videofilepath_basedonthecanonical(lang_seq)
-    os.rename(self.canonical_video_filepath, trg_filepath)
-    scrmsg = f"lang={lang_seq}: renamed canonical file to {trg_filepath}"
-    print(scrmsg)
+    audiocode = self.audioonlycodes[lang_seq - 1]
+    trg_filepath = self.form_bksufixed_videofilepath_basedonthefsufixvideo(lang_seq)
+    if os.path.isfile(trg_filepath):
+      scrmsg = f"""lang={lang_seq} audiocode={audiocode}
+       fixed_videoonlyfilename =  {self.fixed_videoonlyfilename}
+       HAS ALREADY BEEN RENAMED (for complementing later on) to {trg_filepath}"""
+      print(scrmsg)
+      return
+    try:
+      os.rename(self.fixed_videoonlyfilepath, trg_filepath)
+      scrmsg = f"""lang={lang_seq} audiocode={audiocode}
+       fixed_videoonlyfilename =  {self.fixed_videoonlyfilename}
+       RENAMED (for complementing later on) to {trg_filepath}"""
+      print(scrmsg)
+    except (IOError, OSError) as e:
+      errmsg = f"""Error when attempting to rename
+      bksufix lang={lang_seq} audiocode={audiocode} 
+      to the fixed_videoonlyfilename as: [{self.fixed_videoonlyfilename}]
+      => {e}
+      """
+      raise OSError(errmsg)
 
   def verify_tmpdir_once_n_raise_oserror_if_files_wo_pastdatesufixes_exist(self, tmpdir_abspath):
     """
@@ -244,11 +323,14 @@ class Downloader:
     return tmpdir_abspath
 
   @property
-  def dot_f_videocode(self):
+  def dot_f_videoonlycode(self) -> str:
+    """
+    Examples of videoonlycodes are: 160 (a 256x144), 602  (another 256x144) etc
+    """
     _dot_f_videocode = f'.f{self.videoonlycode}'
     return _dot_f_videocode
 
-  def discover_dld_videofilename(self):
+  def discover_dld_videofilename(self) -> bool:
     """
     Because a temporary dir is created for the download,
       there expects to be only one videofile
@@ -258,20 +340,44 @@ class Downloader:
     another one is a checking of the current working directory
     """
     filenames = os.listdir('.')  # notice an os.chdir(<dld_dir>) happened before
-    videofilename_soughtfor = list(filter(lambda f: f.endswith('.mp4'), filenames))
-    if len(videofilename_soughtfor) == 0:
-      return
-    videofilename = videofilename_soughtfor[0]
-    name, dot_ext = os.path.splitext(videofilename)
-    # graft the ".f<number>" sufix before its extension (example ".f160")
-    newname = name + self.dot_f_videocode + dot_ext
-    os.rename(videofilename, newname)
-    # this filename will be used for as many audio files are queued up for download
-    self.video_canonical_filename = newname
-    scrmsg = f"""Discovered videofilename:
-     found =  [{videofilename}]
-     renamed to =  [{self.video_canonical_filename}]"""
+    videofilenames_soughtfor = list(filter(lambda f: f.endswith('.mp4'), filenames))
+    if len(videofilenames_soughtfor) == 0:
+      return False
+    videofilename_soughtfor = videofilenames_soughtfor[0]
+    self.video_canonical_filename = videofilename_soughtfor
+    scrmsg = f"Discovered videofilename after download: [{self.video_canonical_filename}]"
     print(scrmsg)
+    return True
+
+  def rename_canonical_to_the_fixedvideoonlyfile(self) -> bool:
+    """
+    Grafts the ".f<number>" sufix before its extension
+      for example:
+        a) if videoonlycode is 160
+        b) then the in-between fsufix will be ".f160"
+        c) and a filename example should be like "this-filename.f160.mp4"
+
+    Obs: notice that the nicknamed bksufix is another different one in this class,
+         this here is nicknamed fsufix
+         this is noted because sometimes at first nod one confuses
+           the former [bksufix] with the latter [fsufix]
+    """
+    name, dot_ext = os.path.splitext(self.video_canonical_filename)
+    videoonlyfilename = name + self.dot_f_videoonlycode + dot_ext
+    try:
+      if os.path.isfile(videoonlyfilename):
+        srcmsg = f"Not renaming to videoonlyfilename [{self.video_canonical_filename}] as already exists. Continuing."
+        print(srcmsg)
+        return False
+      os.rename(self.video_canonical_filename, videoonlyfilename)
+      self.fixed_videoonlyfilename = videoonlyfilename
+      return True
+    except (IOError, OSError) as e:
+      errmsg = f"""Error when attempting to rename
+      canonical to videoonlyfilename as: [{self.video_canonical_filename}]
+      => {e}
+      """
+      raise OSError(errmsg)
 
   def download_video_only(self):
     """
@@ -298,33 +404,63 @@ class Downloader:
   def get_videoonly_filename_for_number(self, nsufix):
     return self.video_canonical_filename + str(nsufix)
 
-  def rename_videobasefile_sothatitcancomposite(self):
+  def rename_bksufixedfile_backtovideoonlyfilename_sothatitcancomposite(self):
     """
     The supposed videofilename is videobasefilename (*) minus its number sufix
     (*) reminding that the video part is only downloaded once,
         every lang video will be formed by just getting its own audiopart as a complement
     For example:
-      if  videofile is this-video-ytid.f160.mp4.bk3
-      then this rename should only remove the ".bk3" sufix
-        (actually a removal (rstrip) is not necessary, for the canonical name is kept in the object
-        so it's just retrieved)
+      if  videofile is "this-video-ytid.f160.mp4.bk3"
+          then the result videofile should be "this-video-ytid.f160.mp4"
+      ie this rename should only remove the ".bk3" sufix
+        (actually a removal (rstrip) is not necessary,
+          for the canonical-videoonly name is kept in the object (self.fixed_videoonlyfilename)
+          so it's just retrieved)
       resulting filename should be this-video-ytid.f160.mp4
+
+    Notice also that self.n_on_going_lang -- keeping the language 1, 2, 3... sequence -- is also
+      the number for the bksufix
     """
     n_for_bksufix = self.n_on_going_lang
-    videoonly_filename_w_nsufix = self.get_video_or_audio_filename_with_bksufix(n_for_bksufix)
+    videoonly_filename_w_bksufix = self.get_video_or_audio_filename_with_bksufix(n_for_bksufix)
     scrmsg = f"""bksufix = .bk{n_for_bksufix} | renaming:
-    FROM:   {videoonly_filename_w_nsufix}
-    TO:   {self.video_canonical_filename}"""
+    FROM:   {videoonly_filename_w_bksufix}
+    TO:   {self.fixed_videoonlyfilename}"""
     print(scrmsg)
     # check existence
-    srcfilepath = os.path.join(self.child_tmpdir_abspath, videoonly_filename_w_nsufix)
-    if not os.path.isfile(srcfilepath):
-      errmsg = f"Error: srcfile [{videoonly_filename_w_nsufix}] for backrename does not exist."
+    srcfilepath = os.path.join(self.child_tmpdir_abspath, videoonly_filename_w_bksufix)
+    trgfilepath = os.path.join(self.child_tmpdir_abspath, self.fixed_videoonlyfilename)
+    if os.path.isfile(trgfilepath):
+      errmsg = f"Error: trgfile [{self.fixed_videoonlyfilename}] for backrename should not be present at this point."
       raise OSError(errmsg)
-    os.rename(videoonly_filename_w_nsufix, self.video_canonical_filename)
+    try:
+      os.rename(srcfilepath, trgfilepath)
+    except (IOError, OSError) as e:
+      errmsg = f"""Error when attempting to rename
+      canonical to videoonlyfilename as: [{self.video_canonical_filename}]
+      => {e}
+      """
+      raise OSError(errmsg)
 
   def download_audiopart_to_fuse_w_videoonly(self):
-    self.rename_videobasefile_sothatitcancomposite()  # it's done by removing number sufix
+    """
+    One caution here:
+      the videoonly_canonical_filename (the one without sufixes) should not be present,
+        otherwise yt-dlp will deduce that the composition has already happened,
+        so if the videoonly_canonical_filename is present,
+        this is an error to be caught (exception to be raised)
+    """
+    self.rename_bksufixedfile_backtovideoonlyfilename_sothatitcancomposite()  # it's done by removing number sufix
+    # now, after the previous rename, the above caution in the docstr can be checked
+    if os.path.isfile(self.video_canonical_filepath):
+      # oh, oh error
+      errmsg = f"""Error:
+      the canonical_videoonly_filename [{self.video_canonical_filename}] should not be present in dir,
+      otherwise yt-dlp will deduce that the audio+video composite has already happened which it doesn't yet,
+        so, in a nutshell, if the canonical_videoonly_filename is present in dir,
+        raises this interruption so that one may look up to this problem 
+      """
+      raise OSError(errmsg)
     audiocode = self.audioonlycodes[self.n_on_going_lang - 1]
     compositecode = f"{self.videoonlycode}+{audiocode}"
     pdict = {'compositecode': compositecode, 'videourl': self.videourl}
@@ -345,6 +481,11 @@ class Downloader:
       print("Interrupted by user. Exiting loop.")
 
   def rename_videofile_after_audiovideofusion(self):
+    """
+    To troubleshoot:
+      video_canonical_filename is wrongly taking the fsufix (ex f160)
+      after the first fusion (ie the download of the first audio and formation of the 1st lang video)
+    """
     newfilename = f"lang{self.n_on_going_lang} " + self.video_canonical_filename
     trg_filepath = os.path.join(self.child_tmpdir_abspath, newfilename)
     audiocode = self.audioonlycodes[self.n_on_going_lang-1]
@@ -353,10 +494,10 @@ class Downloader:
     TO:   {newfilename}
     """
     print(scrmsg)
-    if not os.path.isfile(self.canonical_video_filepath):
-      errmsg = f"Error: srcfile [{self.canonical_video_filepath}] for lang-add-rename does not exist."
+    if not os.path.isfile(self.video_canonical_filepath):
+      errmsg = f"Error: srcfile [{self.video_canonical_filepath}] for lang-add-rename does not exist."
       raise OSError(errmsg)
-    os.rename(self.canonical_video_filepath, trg_filepath)
+    os.rename(self.video_canonical_filepath, trg_filepath)
 
   def download_audio_complements(self):
     """
@@ -377,21 +518,26 @@ class Downloader:
         5-1 download the audiofile proper
         5-2 "fuse" it with the videofile in store so that the composite results
     """
-    scrmsg = f"1st -> position at the working tmpdir {self.child_tmpdir_abspath}"
+    scrmsg = f"""1st step ->
+    POSITION (chdir) at the working tmpdir: [{self.child_tmpdir_abspath}]"""
     print(scrmsg)
     os.chdir(self.child_tmpdir_abspath)
-    scrmsg = "2nd -> download the 160 video"
+    scrmsg = f"""2nd step ->
+    DOWNLOAD the 160 video (ytid={self.ytid})"""
     print(scrmsg)
     self.download_video_only()
-    scrmsg = "3rd -> copy it once because one will be used for Italian, the other for English"
-    print(scrmsg)
-    scrmsg = "3rd -> disconver the downloaded video's filename"
+    scrmsg = f"""3rd step -> 
+    DISCOVER the downloaded video's filename (with ytid={self.ytid}) and rename it to the videoonlyfile
+             that one will serve the audio files to later compose audio+video"""
     print(scrmsg)
     self.discover_dld_videofilename()
-    scrmsg = "4th -> copy it to as many as there audio lang entered"
+    self.rename_canonical_to_the_fixedvideoonlyfile()
+    scrmsg = f"""4th step ->
+    COPY it  (with ytid={self.ytid}) to as many as there are audio lang entered"""
     print(scrmsg)
     self.copy_n_rename_videoonly_n_lang_times()
-    scrmsg = "5th -> download the audio(s) complements"
+    scrmsg = f"""5th step ->
+    DOWNLOAD (with ytid={self.ytid}) the audio(s) complements | audioonlycodes={self.audioonlycodes}"""
     print(scrmsg)
     self.download_audio_complements()
     # move all videos from child_tmpdir_abspath to its parent dir
