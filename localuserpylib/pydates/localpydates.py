@@ -5,6 +5,7 @@ localuserpylib/pydates/localpydates.py
 """
 import datetime
 from typing import Generator
+from xmlrpc.client import boolean
 
 
 def gen_last_n_monday_dates_from_date(pdate: datetime.date, n=50) -> Generator[datetime.date, None, None]:
@@ -140,6 +141,42 @@ def get_weekdayname_from_isoweekday(isoweekday: int) -> str | None:
   if isoweekday in range(1, 8):
     return weekdaynames[isoweekday - 1]
   return None
+
+
+def transform_std_strdate_into_pydate(strdate: str | None) -> datetime.date | None:
+  if strdate is None:
+    return None
+  try:
+    pp = strdate.split('-')
+    year = int(pp[0])
+    month = int(pp[1])
+    day = int(pp[2])
+    pdate = datetime.date(year=year, month=month, day=day)
+    return pdate
+  except (IndexError, ValueError):
+    pass
+  return None
+
+
+def is_strdate_a_std_str_date(strdate: str | None) -> boolean:
+  """
+  if isinstance(pdate, datetime.date):
+    return True
+  """
+  pdate = transform_std_strdate_into_pydate(strdate)
+  if pdate is None:
+    return False
+  return True
+
+
+def is_strdate_before_today(strdate: str | None) -> boolean:
+  pdate = transform_std_strdate_into_pydate(strdate)
+  if not isinstance(pdate, datetime.date):
+    return False
+  today = datetime.date.today()
+  if pdate < today:
+    return True
+  return False
 
 
 def adhoc_test2():
