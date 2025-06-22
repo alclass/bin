@@ -2,41 +2,53 @@
 """
 ~/bin/dlYouTubeWhenThereAreDubbed.py
 
-This script uses yt-dlp to download (YouTube) videos in two or more languages if available
+This script uses yt-dlp to download (YouTube) a video in two or more languages if available
   (translations in general are autodubbed)
+  (each language forms a separate videofile)
 
 This script accepts the following input:
   1  it receives as input a youtube-video-id (ytid)
-  2  it also receives the codes for languages (it does not discover them, the user has to enter them)
-     obs: as far as we've observed, these codes are not standardized,
-          for example, in general, a video that is autodubbed into English
-            has sufix "-0" added to its audiocode (example: 233-0 or 234-0),
-            but if the original audio is already English,
-            it seems undeterminate what "dash-number" the system will give to it
-            (example: it might be a "-7", or a "-8" or a "-9"
-              (the user would have to find and enter it via the audiocodes parameter),
-              asking the API [something not done here] could make this known)
-            On the other hand, what seems stable is when English is autodubbed
-              so it gets the "-0" annexed to the audiocode and the original language an "-1"
-              (example: 233-0 English and 233-1 the original other language)
+  2  alternatively, instead of a ytid, it may receive as input ytids in a text file (whose name is youtube-ids.txt)
+  3  it receives as input the videoonlycode (it's only one number, and it's an integer)
+  4  it also receives the audioonlycodes for languages (it does not discover them, the user has to enter them)
 
-This script downloads the video-only part exactly once and copies it to each new language.
-This saves transfer bytes and redownload times.
+Observation about standardization of audio format codes:
+  As far as we've observed, these codes are not "fully" standardized
+    For example, in general, a video that is autodubbed into English
+      has sufix "-0" added to its audioonlycode (example: 233-0 or 234-0),
+      but if the original audio is already English,
+      it seems undeterminate what "dash-number" the YouTube (web) system will give to it
+        example: it might be either a "-7", or a "-8" or a "-9"
+        (ie, it's not a standard fixed dash-number for all cases)
+        the user would have to find out and enter it via the audiocodes parameter
 
-For example,
-  1 suppose a video id as <videoid>
-  2 suppose also that videocode 160 is available
-  3 suppose also that audio codes are available in dubbed Italian (as 233-5) and in the original English (as 233-9)
+  This script as yet doesn't do an API asking for a mapping of language to audio-only format code
+
+  On the other hand, what seems stable is when English is autodubbed and another language is the original
+  In these cases, English gets a "-0" annexed to the audioonlycode and the original language gets a "-1"
+    Examples:
+       233-0 autodubbed English and 233-1 the original other language
+       234-0 autodubbed English and 234-1 the original other language
+
+This script downloads the video-only part exactly once and copies it to each new audio language piece.
+This saves transfer bytes and redownload times, because the n-language resulting videos will be formed,
+  each one, by joining its videopart (the same for all languages) with its audiopart (language by language).
+
+For example:
+  1 suppose a video with available autodubbed translation(s)
+  2 suppose also that videoonlycode 160 is available
+  3 suppose also that audioonlycodes are available in dubbed Italian (as 233-5) and in the original English (as 233-9)
 
 Then, this script will:
   1st download the 160 video
-  2nd copy it once because one will be used for Italian, the other for English
-  3rd download the 160+233-5, yt-dlp recognizes that the video is present and proceeds to download the audio "it" part
-  4th download the 160+233-9, idem for "en"
+  2nd copy it once (making two of them) because one will be used for Italian (it), the other for English (en)
+  3rd download the 160+233-5, yt-dlp recognizes that the videopart is already present
+    and proceeds to download only the audio "it" piece (yt-dlp then blends the audio with the videoonly)
+  4th download the 160+233-9, idem for the "en" piece
 
-An example of language audiocodes, having English as the original,
-    used for one of the channels we've seen (notice that this pattern may not be a general one):
-
+An example of language audiocodes, having English as the original:
+    (seen in a channel we visited) (notice that this pattern may not be a general rule):
+    (this example shows only the dash-numbers for the audioonlycode 233)
   233-0  mp4 audio only    m3u8 [de-DE] Deutsch (Deutschland) - dubbed-auto
   233-1  mp4 audio only    m3u8 [es-US] es-US - dubbed-auto
   233-2  mp4 audio only    m3u8 [fr-FR] Français (France) - dubbed-auto
@@ -48,27 +60,40 @@ An example of language audiocodes, having English as the original,
   233-8  mp4 audio only    m3u8 [pt-BR] Português (Brasil) - dubbed-auto
   233-9  mp4 audio only    m3u8 [en-US] American English - original (default)
 
-An example of language audiocodes, having Portuguese as the original,
-    used for one of the channels:
-
+An example of language audiocodes, having Portuguese as the original:
+    (seen in another channel we visited):
+    (again it only shows the dash-numbers for the audioonlycode 233)
   233-0  mp4 audio only    m3u8 [en-US] American English - original (default)
   233-1  mp4 audio only    m3u8 [pt-BR] Português (Brasil) - dubbed-auto
 
 This second case (where English is autodubbed) seems more stable in terms of standardized audiocodes.
-The first case (where English is original) seems to differ a little but enough to "miss the point".
-  The user has to use the audiocodes parameter to tell the correct audiocodes.
-  A programatic discovery via yt-dlp might be done, but as of yet this is not performed by this script.
+The first case (where English is the original) seems to differ a little among channels
+  but enough to "miss the point", at some moment, if applied generally.
+The user has to use the audiocodes CLI parameter to tell the correct audiocodes (*).
+  The default today uses [233-0, 233-1]
+    roughly stable for when English is autodubbed and another language is the original
 
-Notice that in the first example above, the original English is 233-9 and, in the second, English autodubbed, it's 233-0
+ (*) to see the full list of CLI parameters for this script, run it with --help
 
+A programatic discovery of these audioonlycodes (mapping language to format code)
+  via yt-dlp might be done in the future,
+  but as yet this is not performed by this script
+
+Notice as a reemphasis that in the first example above, the original English is 233-9
+  and, in the second, English autodubbed, it's 233-0
+
+===========
 Limitation: what does this script not do (at least yet)?
 
-  1 it doesn't discover the language codes, even less which codes are available at all
-    (the user enters those, this could be a TODO here for these codes are given with the parameter -F in yt-dlp)
+  1 it doesn't discover the language codes, even less which codes for a certain video are available at all
+    (@see also docstr above)
+    (the user may find out available format codes using the -F (or --format) parameter in yt-dlp)
   2 it may not be able to check all problems from the command line, but if subprocess returns 0,
-    it's a good sign that both the network is working and videos are complete
-    if subprocess does not return with 0, a message will be printed out indicating the error,
-      but at the time of writing, it just a print-out, the program continues
+    it's a good sign that both the network is working and videos have "arrived" complete
+    if subprocess does not return with 0, at the time of writing,
+      program will halt showing its error message
+    (ie, this script does not yet treat non-0 return cases [*] in a better way)
+    [*] imagining mostly that non-O returns are network problems or yt-dlp upgrade needs
 """
 import argparse
 import os.path
@@ -76,7 +101,7 @@ import shutil
 import string
 import subprocess
 import sys
-from localuserpylib.pydates import localpydates as pydates
+# from localuserpylib.pydates import localpydates as pydates
 DEFAULT_YTIDS_FILENAME = 'youtube-ids.txt'
 YTID_CHARSIZE = 11
 enc64_valid_chars = string.digits + string.ascii_lowercase + string.ascii_uppercase + '_-'
@@ -117,14 +142,14 @@ def verify_ytid_validity_or_raise(ytid):
   if ytid is None:
     errmsg = 'Error: ytid cannot be empty, please reenter it.'
     raise ValueError(errmsg)
-  all_chars_enc64 = True  # until proven contrary
+  is_ytid_enc64_compliant = True  # until proven contrary
   # 1 - verify chars are ENC64
   should_not_have_falses = list(map(lambda c: c in enc64_valid_chars, ytid))
   size = len(str(ytid))
   if False in should_not_have_falses:
-    all_chars_enc64 = False
+    is_ytid_enc64_compliant = False
   # 2 - verify charsize is YTID_CHARSIZE (11 at the time of writing)
-  if size != YTID_CHARSIZE or not all_chars_enc64:
+  if size != YTID_CHARSIZE or not is_ytid_enc64_compliant:
     errmsg = (
       f"""
       Please check the following two problems with ytid (the {YTID_CHARSIZE}-character video id):
@@ -135,9 +160,9 @@ def verify_ytid_validity_or_raise(ytid):
       1 It must have {YTID_CHARSIZE} characters: {len(ytid) == YTID_CHARSIZE}: It has {size}
 
       2 All its characters should be ENC64
-        In "{ytid}", is it ENC64? {all_chars_enc64}
+        In "{ytid}", is it ENC64? {is_ytid_enc64_compliant}
 
-      ENC64 characters are: "{enc64_valid_chars}"
+      All 64 ENC64 characters are: "{enc64_valid_chars}"
 
       Please, correct the observations(s) above and retry.
       """
@@ -147,11 +172,14 @@ def verify_ytid_validity_or_raise(ytid):
 
 class Downloader:
 
+  # class-wide static constants
   DEFAULT_VIDEO_ONLY_CODE = 160
+  DEFAULT_AUDIO_ONLY_CODES = ['233-0', '233-1']
   videodld_tmpdirname = 'videodld_tmpdir'
+  video_dot_extensions = ['.mp4', '.mkv', '.webm', '.m4v', '.avi', '.wmv']
+  # class-wide static interpolable-string constants
   comm_line_base = 'yt-dlp -w -f {compositecode} "{videourl}"'
   video_baseurl = 'https://www.youtube.com/watch?v={ytid}'
-  video_dot_extensions = ['.mp4', '.mkv', '.webm', '.m4v', '.avi', '.wmv']
 
   def __init__(
       self,
@@ -168,14 +196,21 @@ class Downloader:
     self.b_verified_once_tmpdir_abspath = None
     self.video_canonical_filename = None  # this is the video filename with the f-sufix, it's known after download
     self.fixed_videoonlyfilename = None
-    self.n_on_going_lang = 0
+    self.previously_existing_filenames_in_tmpdir = []
+    self.n_ongoing_lang = 0
 
   def treat_input(self):
     verify_ytid_validity_or_raise(self.ytid)
     if self.dlddir_abspath is None:
+      # default is the current working directory
       self.dlddir_abspath = os.path.abspath('.')
     if self.videoonlycode is None:
+      # this is the default for the videocode
       self.videoonlycode = self.DEFAULT_VIDEO_ONLY_CODE
+    if self.audioonlycodes is None or len(self.audioonlycodes) == 0:
+      # this default for the audiocodes generally works when English is autodubbed and another language is the original
+      # notice that this script, at the time of writing, does not know about which language is which (@see docstr above)
+      self.audioonlycodes = self.DEFAULT_AUDIO_ONLY_CODES
 
   @property
   def fixed_videoonlyfilepath(self):
@@ -199,16 +234,26 @@ class Downloader:
     videofilename_w_bksufix = self.fixed_videoonlyfilename + bksufix
     return videofilename_w_bksufix
 
-  def get_video_or_audio_filename_with_fsufix(self, fsufix):
+  def form_the_fixedvideoonlyfname_w_fsufix_fr_the_canonicalfname(self):
     """
-        os.path.join(self.child_tmpdir_abspath, self.video_canonical_filename)
+      Let's look at the fsufix with an example:
+            a-videofilename-ytid.f160.mp4
+      In this example, ".f160" is a videoonly sufix coming before the extension
+      (it's videoonly because videoformat code 160 is videoonly, ie video without audio)
+
+      So this method does the following:
+      a) it takes the canonical filename:
+        In the example:
+            a-videofilename-ytid.mp4
+      b) and grafts (inserts) the ".f160" before the extension
+        In the example:
+            a-videofilename-ytid.f160.mp4
+
+      Notice that this method does not use the other sufix in this script, the bksuffix (@see above)
     """
-    name, dotext = os.path.splitext(self.video_canonical_filename)
-    if fsufix.startswith('.'):
-      newname_w_fsufix = name + fsufix
-    else:
-      newname_w_fsufix = name + '.' + fsufix
-    fsufixed_filename = f"{newname_w_fsufix}{dotext}"
+    name, dot_ext = os.path.splitext(self.video_canonical_filename)
+    dot_fsufix = f".f{self.videoonlycode}"
+    fsufixed_filename = f"{name}{dot_fsufix}{dot_ext}"
     return fsufixed_filename
 
   @property
@@ -288,26 +333,34 @@ class Downloader:
       """
       raise OSError(errmsg)
 
-  def verify_tmpdir_once_n_raise_oserror_if_files_wo_pastdatesufixes_exist(self, tmpdir_abspath):
+  def store_files_that_already_exist_into_a_list(self, tmpdir_abspath):
+    """
+    routine that looked up dateprefix, discontinued later on (kept for history purpose)
+      pp = filename.split(' ')
+      strdate = pp[0]
+      if not pydates.is_strdate_before_today(strdate):
+        errmsg = fDate Sufix [{strdate}] in filename is either missing or it's not past today
+        raise OSError(errmsg)
+    """
+    filenames = os.listdir(tmpdir_abspath)
+    for filename in filenames:
+      if not filename.endswith(tuple(self.video_dot_extensions)):
+        continue
+      self.previously_existing_filenames_in_tmpdir.append(filename)
+
+  def verify_tmpdir_once_n_store_files_already_existing(self, tmpdir_abspath):
     """
     This method:
       1: creates tmpdir if needed
-      2: verifies that if there are videos in tmpdir, it should be date-prefixed and this date be past 'today'
+      2: ignores (jumps over) files that are not video (by extension)
+      3: those are video (by extension) have their filenames stored for later finding the downloaded one
       3: in case a video exists with today's date, an OSError exception is raised
     :param tmpdir_abspath:
     :return:
     """
     self.b_verified_once_tmpdir_abspath = False
     os.makedirs(tmpdir_abspath, exist_ok=True)
-    filenames = os.listdir(tmpdir_abspath)
-    for filename in filenames:
-      if not filename.endswith(tuple(self.video_dot_extensions)):
-        continue
-      pp = filename.split(' ')
-      strdate = pp[0]
-      if not pydates.is_strdate_before_today(strdate):
-        errmsg = f"Date Sufix [{strdate}] in filename is either missing or it's not past today"
-        raise OSError(errmsg)
+    self.store_files_that_already_exist_into_a_list(tmpdir_abspath)
     self.b_verified_once_tmpdir_abspath = True
 
   @property
@@ -319,39 +372,96 @@ class Downloader:
     """
     tmpdir_abspath = os.path.join(self.dlddir_abspath, self.videodld_tmpdirname)
     if not self.b_verified_once_tmpdir_abspath:
-      self.verify_tmpdir_once_n_raise_oserror_if_files_wo_pastdatesufixes_exist(tmpdir_abspath)
+      self.verify_tmpdir_once_n_store_files_already_existing(tmpdir_abspath)
     return tmpdir_abspath
 
   @property
-  def dot_f_videoonlycode(self) -> str:
+  def fsufix(self) -> str:
     """
     Examples of videoonlycodes are: 160 (a 256x144), 602  (another 256x144) etc
     """
-    _dot_f_videocode = f'.f{self.videoonlycode}'
-    return _dot_f_videocode
+    _fsufix = f"f{self.videoonlycode}"
+    return _fsufix
 
-  def discover_dld_videofilename(self) -> bool:
+  @property
+  def dot_fsufix(self) -> str:
+    """
+    Examples of videoonlycodes are: 160 (a 256x144), 602  (another 256x144) etc
+    """
+    _dot_fsufix = f'.{self.fsufix}'
+    return _dot_fsufix
+
+  def fallbackcase_ask_user_what_the_downloaded_filename_is(self):
+    scrmsg = f"""Script was not able to find the downloaded filename,
+     this can happen when the download had alread happened before,
+     please check whether one can be found in the tmpdir and enter it here
+     ---------------------------------------------------------------------
+     the tmpdir to look up is [{self.child_tmpdir_abspath}]
+     ---------------------------------------------------------------------
+     In case one cannot be found, type [ENTER] to stop script and
+     restart it back up after cleaning up tmpdir (ie leaving the directory empty without files)
+     ---------------------------------------------------------------------
+     type downloaded filename or [ENTER] => """
+    ans = input(scrmsg)
+    if ans == '':
+      sys.exit(1)
+    # check entered filename
+    filename = ans
+    filepath = os.path.join(self.child_tmpdir_abspath, filename)
+    if not os.path.isfile(filepath):
+      errmsg = f"""Error:
+      entered filename "{filename}" does not exist in tmpdir:
+      tmpdir = {self.child_tmpdir_abspath}'
+      Please, emtpy this tmpdir directory and retry this program.
+      (From an empty dir, script will be able to find the correct downloaded filename.)
+      If it tmpdir was already empty, the following two actions may be looked up at:
+        a) check network connection 
+        b) check the status of the underlying yt-dlp command (it may need upgrading)
+      """
+      print(errmsg)
+      sys.exit(1)
+    return filename
+
+  def discover_dld_videofilename(self):
     """
     Because a temporary dir is created for the download,
-      there expects to be only one videofile
-    Then, one looks for one file (and only one) with a video extension
-    (for the time being, code 160 or 602 are mp4 - they will be hardcoded for the time being)
-    (a second option might be mkv, but this is a TODO for the time being)
-    another one is a checking of the current working directory
+      one expects there will be only one videofile (*) after the first download happens
+        and its name will be just easy to find out by looking dir-contents
+
+    However, this script is also prepared to work with a legacy tmpdir and this poses a problem
+      if the sought-for file was already downloaded before running the script
+      (because this script does not know what the downloaded filename will be
+        except by comparing dir-contents: before and after)
+
+    This method looks for one file (and one only) with a video extension (*)
+      1 - it looks for a filename that is not inside the previously stored videofilenames list
+      2 - if it can't find it (the hypothesis given above), it asks the user for that
+      3 - if the user can't find it either, this script then asks for the user to retry after cleaning up tmpdir,
+          ie, leaving it empty for the new run
+
+    (*) The extension list for videos is hardcoded for the time being
+        ie, it's a (static) list at the class root level
     """
-    filenames = os.listdir('.')  # notice an os.chdir(<dld_dir>) happened before
-    videofilenames_soughtfor = list(filter(lambda f: f.endswith('.mp4'), filenames))
-    if len(videofilenames_soughtfor) == 0:
-      return False
-    videofilename_soughtfor = videofilenames_soughtfor[0]
+    allfilenames = os.listdir('.')  # notice an os.chdir(<dld_dir>) happened before
+    videofilenames = filter(lambda f: f.endswith('.mp4'), allfilenames)
+    videofilenames_appearing_after = list(
+      filter(
+        lambda f: f not in self.previously_existing_filenames_in_tmpdir,
+        videofilenames
+      )
+    )
+    n_results = len(videofilenames_appearing_after)
+    if n_results == 0 or n_results > 1:
+      videofilename_soughtfor = self.fallbackcase_ask_user_what_the_downloaded_filename_is()
+    else:
+      videofilename_soughtfor = videofilenames_appearing_after[0]
     self.video_canonical_filename = videofilename_soughtfor
     scrmsg = f"Discovered videofilename after download: [{self.video_canonical_filename}]"
     print(scrmsg)
-    return True
 
   def rename_canonical_to_the_fixedvideoonlyfile(self) -> bool:
     """
-    Grafts the ".f<number>" sufix before its extension
+    Grafts (inserts) the ".f<number>" sufix before its extension
       for example:
         a) if videoonlycode is 160
         b) then the in-between fsufix will be ".f160"
@@ -361,28 +471,34 @@ class Downloader:
          this here is nicknamed fsufix
          this is noted because sometimes at first nod one confuses
            the former [bksufix] with the latter [fsufix]
+           and this bksufix is not used in this method
     """
-    name, dot_ext = os.path.splitext(self.video_canonical_filename)
-    videoonlyfilename = name + self.dot_f_videoonlycode + dot_ext
+    self.fixed_videoonlyfilename = self.form_the_fixedvideoonlyfname_w_fsufix_fr_the_canonicalfname()
+    if os.path.isfile(self.fixed_videoonlyfilename):
+      srcmsg = f"""Not renaming to fixed_videoonlyfilename [{self.video_canonical_filename}] as it already exists.
+      Continuing."""
+      print(srcmsg)
+      return False
     try:
-      if os.path.isfile(videoonlyfilename):
-        srcmsg = f"Not renaming to videoonlyfilename [{self.video_canonical_filename}] as already exists. Continuing."
-        print(srcmsg)
-        return False
-      os.rename(self.video_canonical_filename, videoonlyfilename)
-      self.fixed_videoonlyfilename = videoonlyfilename
+      os.rename(self.video_canonical_filename, self.fixed_videoonlyfilename)
       return True
     except (IOError, OSError) as e:
       errmsg = f"""Error when attempting to rename
-      canonical to videoonlyfilename as: [{self.video_canonical_filename}]
+      canonical to fixed_videoonlyfilename as: [{self.video_canonical_filename}]
       => {e}
       """
       raise OSError(errmsg)
 
   def download_video_only(self):
     """
-    At this point, that video filename will be known
-    :return:
+    This method download the videoonlyfile via yt-dlp using subprocess.run()
+
+    At the time of this writing, when subprocess raises subprocess.CalledProcessError
+      the script wraps it up with an additional error-message and raises ValueError
+
+    [For later on]
+    This may be improved later on if some of the hypotheses for the
+      subprocess.CalledProcessError exception allow this program to continue on
     """
     strdict = {'compositecode': self.videoonlycode, 'videourl': self.videourl}
     comm = self.comm_line_base.format(**strdict)
@@ -396,13 +512,25 @@ class Downloader:
     # except subprocess.TimeoutExpired:
     #     print(f"Command timed out: {comm}")
     except subprocess.CalledProcessError as e:
-      print(f"Command failed with return code {e.returncode}: {comm}")
+      errmsg = f"""Command: [{comm}]
+       failed with return code: [{e.returncode}]
+       => {e}"""
+      print(errmsg)
+      raise ValueError(errmsg)
     except KeyboardInterrupt:
-      print("Interrupted by user. Exiting loop.")
+      scrmsg = "Interrupted by user. Exiting loop. Continuing."
+      print(scrmsg)
     return True
 
-  def get_videoonly_filename_for_number(self, nsufix):
-    return self.video_canonical_filename + str(nsufix)
+  def form_stocked_videoonlyfilename_w_fsufix_n_bksufix(self, nsufix):
+    """
+    This method is not in use (with the IDE, clicking it goes nowhere)
+      but a future refactoring may put this in use
+    """
+    dot_bksufix = f".bk{nsufix}"
+    name, dot_ext = os.path.splitext(self.video_canonical_filename)
+    stocked_videoonlyfilename_w_fsufix_n_bksufix = f"{name}{self.dot_fsufix}{dot_ext}{dot_bksufix}"
+    return stocked_videoonlyfilename_w_fsufix_n_bksufix
 
   def rename_bksufixedfile_backtovideoonlyfilename_sothatitcancomposite(self):
     """
@@ -421,7 +549,7 @@ class Downloader:
     Notice also that self.n_on_going_lang -- keeping the language 1, 2, 3... sequence -- is also
       the number for the bksufix
     """
-    n_for_bksufix = self.n_on_going_lang
+    n_for_bksufix = self.n_ongoing_lang
     videoonly_filename_w_bksufix = self.get_video_or_audio_filename_with_bksufix(n_for_bksufix)
     scrmsg = f"""bksufix = .bk{n_for_bksufix} | renaming:
     FROM:   {videoonly_filename_w_bksufix}
@@ -461,7 +589,7 @@ class Downloader:
         raises this interruption so that one may look up to this problem 
       """
       raise OSError(errmsg)
-    audiocode = self.audioonlycodes[self.n_on_going_lang - 1]
+    audiocode = self.audioonlycodes[self.n_ongoing_lang - 1]
     compositecode = f"{self.videoonlycode}+{audiocode}"
     pdict = {'compositecode': compositecode, 'videourl': self.videourl}
     comm = self.comm_line_base.format(**pdict)
@@ -486,10 +614,10 @@ class Downloader:
       video_canonical_filename is wrongly taking the fsufix (ex f160)
       after the first fusion (ie the download of the first audio and formation of the 1st lang video)
     """
-    newfilename = f"lang{self.n_on_going_lang} " + self.video_canonical_filename
+    newfilename = f"lang{self.n_ongoing_lang} " + self.video_canonical_filename
     trg_filepath = os.path.join(self.child_tmpdir_abspath, newfilename)
-    audiocode = self.audioonlycodes[self.n_on_going_lang-1]
-    scrmsg = f"""lang={self.n_on_going_lang} | audiocode={audiocode} | renaming:
+    audiocode = self.audioonlycodes[self.n_ongoing_lang - 1]
+    scrmsg = f"""lang={self.n_ongoing_lang} | audiocode={audiocode} | renaming:
     FROM: {self.video_canonical_filename}
     TO:   {newfilename}
     """
@@ -503,7 +631,7 @@ class Downloader:
     """
     self.n_on_going_lang is an instance variable that controls lang orderseq throughout the class
     """
-    for self.n_on_going_lang in range(1, self.n_langs+1):
+    for self.n_ongoing_lang in range(1, self.n_langs + 1):
       self.download_audiopart_to_fuse_w_videoonly()
       self.rename_videofile_after_audiovideofusion()
 
@@ -583,7 +711,7 @@ def get_cli_args():
   # default to the current working directory if none is given
   dirpath = args.dirpath or os.path.abspath(".")
   videoonlycode = args.videoonlycode or None
-  audioonlycodes = args.audioonlycodes or None
+  audioonlycodes = args.audioonlycodes or []
   return ytid, boo_readfile, dirpath, videoonlycode, audioonlycodes
 
 
@@ -638,7 +766,7 @@ def process():
     ytids = read_ytids_from_default_file_n_get_as_list(dirpath)
   else:
     ytids = [ytid]
-  scrmsg = f'ytids are: {ytids}'
+  scrmsg = f'Entered ytid(s) is/are: {ytids}'
   print(scrmsg)
   for ytid in ytids:
     downloader = Downloader(
