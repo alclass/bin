@@ -549,13 +549,16 @@ class Downloader:
     soughtfor_alt_filepath = None
     canoname, a_previous_dot_ext = os.path.splitext(self.video_canonical_filename)
     extensions = list(self.previously_existing_filenames_in_tmpdir)
-    extensions.remove(a_previous_dot_ext)
+    try:
+      extensions.remove(a_previous_dot_ext)
+    except ValueError:
+      pass
     # look up one among "all" available
     while len(extensions) > 0:
       next_dot_ext = extensions.pop()
       # recompose filename with new extension
       soughtfor_alt_filename = f"{canoname}{next_dot_ext}"
-      soughtfor_alt_filepath = os.path.join(folderpath, soughtfor_alt_filename)
+      soughtfor_alt_filepath = os.path.join(self.child_tmpdir_abspath, soughtfor_alt_filename)
       if not os.path.isfile(soughtfor_alt_filepath):
         return soughtfor_alt_filepath
     errmsg = (f"Error: canonical file [{self.video_canonical_filename}] is not present in dir "
@@ -707,19 +710,23 @@ class Downloader:
       video_canonical_filename is wrongly taking the fsufix (ex f160)
       after the first fusion (i.e., the download of the first audio and formation of the 1st lang video)
     """
-    newfilename = f"lang{self.n_ongoing_lang} " + self.video_canonical_filename
-    trg_filepath = os.path.join(self.child_tmpdir_abspath, newfilename)
+    langprefixfilename = f"lang{self.n_ongoing_lang} " + self.video_canonical_filename
+    trg_filepath = os.path.join(self.child_tmpdir_abspath, langprefixfilename)
     audiocode = self.audioonlycodes[self.n_ongoing_lang - 1]
     scrmsg = f"""lang={self.n_ongoing_lang} | audiocode={audiocode} | renaming:
     FROM: {self.video_canonical_filename}
-    TO:   {newfilename}
+    TO:   {langprefixfilename}
     """
     print(scrmsg)
+    canofilepath = self.video_canonical_filepath
     if not os.path.isfile(self.video_canonical_filepath):
-      self.fallback_try_find_samecanonicalpath_w_different_ext()
-      errmsg = f"Error: srcfile [{self.video_canonical_filepath}] for lang-add-rename does not exist."
-      raise OSError(errmsg)
-    os.rename(self.video_canonical_filepath, trg_filepath)
+      canofilepath = self.fallback_try_find_samecanonicalpath_w_different_ext()
+      if canofilepath is None:
+        # can't rename
+        wrnmsg = (f"Cannot rename canonical filename {self.video_canonical_filename}"
+                  f"  to {langprefixfilename}.\n  It's not present in folder.")
+        print(wrnmsg)
+    os.rename(canofilepath, trg_filepath)
 
   def download_audio_complements(self):
     """
