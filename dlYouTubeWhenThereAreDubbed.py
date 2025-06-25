@@ -200,6 +200,9 @@ class OSEntry:
 
   @basefilename.setter
   def basefilename(self, filename):
+    if filename is None:
+      # this should happen at the beginning when filename is not yet known
+      return
     self.name, self.dot_ext = os.path.splitext(filename)
     if self.dot_ext not in REGISTERED_VIDEO_DOT_EXTENSIONS:
       errmsg = (f"extension {self.dot_ext} not in the REGISTERED_VIDEO_DOT_EXTENSIONS"
@@ -264,8 +267,8 @@ class OSEntry:
     An example:
       title.f160.ext.bk3
 
-    In the example, parts after title are:
-      f160 => an "f" following by the videoonlycode
+    For example, parts after title are:
+      f160 => an "f" followed by the videoonlycode
       ext => the current extension
       bk3 => means it's the 3rd copy of the videoonlyfile that will compose with a 3rd language audio file
 
@@ -325,7 +328,7 @@ class OSEntry:
     An example of a filename name_fsufix_ext_bksufix is as follows:
       it takes a fsufix video, say, videoonlycode=160 (a 256x144 video), forming:
 
-      a) filename.f160.mp4 (in the example this is self.fsufixed_videoonlyfilename)
+      a) filename.f160.mp4 (in the example, this is self.fsufixed_videoonlyfilename)
     and appends to it a bksufix, say:
       b) filename.f160.mp4.bk2
 
@@ -540,6 +543,24 @@ class Downloader:
 
   def discover_dldd_videofilename(self):
     """
+    The old discovery method was based on a comparison before versus after.
+    This new one is based on searching for a file with ytid in its name.
+    """
+    filenames = os.listdir(self.child_tmpdir_abspath)
+    filenames = filter(lambda f: self.ytid in f, filenames)
+    filenames = list(filter(lambda f: f.endswith(tuple(self.video_dot_extensions)), filenames))
+    if len(filenames) == 1:
+      filename_found = filenames[0]
+      scrmsg = f"""At after-download file discovery:
+      ytid = {self.ytid}
+      found = {filename_found}"""
+      print(scrmsg)
+    else:
+      filename_found = self.fallbackcase_ask_user_what_the_downloaded_filename_is()
+    self.osentry.basefilename = filename_found
+
+  def discover_dldd_videofilename_old(self):
+    """
     Because a temporary dir is created for the download,
       one expects there will be only one videofile (*) after the first download happens
         and its name will be just easy to find out by looking dir-contents
@@ -574,6 +595,8 @@ class Downloader:
       videofilename_soughtfor = self.fallbackcase_ask_user_what_the_downloaded_filename_is()
     else:
       videofilename_soughtfor = videofilenames_appearing_after[0]
+    scrmsg = f"osentry.basefilename videofilename_soughtfor = {videofilename_soughtfor}"
+    print(scrmsg)
     self.osentry.basefilename = videofilename_soughtfor
     scrmsg = f"Discovered videofilename after download: [{self.osentry.fn_as_name_ext}]"
     print(scrmsg)
@@ -644,9 +667,9 @@ class Downloader:
 
   def find_existfilepath_of_samecanonicalfilename_w_different_ext_or_none(self):
     """
-    At this point the canonical filepath (with the name created by yt-dlp)
+    At this point, the canonical filepath (with the name created by yt-dlp)
       is not present in dir.
-    Chances are its extension got changed with a different combination of audio & video fusion.
+    Chances are its extension got changed with a different combination of audio and video fusion.
 
     Example: instead of mp4, it may now be mkv
       (the blending of audio+video may have changed a previous extension)
@@ -666,7 +689,7 @@ class Downloader:
       extensions.remove(curr_dot_ext)
     except ValueError:
       pass
-    # look up if there are still extensions in list
+    # look up if there are still extensions in the list
     while len(extensions) > 0:
       next_dot_ext = extensions.pop()
       # recompose filename with new extension
@@ -713,23 +736,39 @@ class Downloader:
     print(scrmsg)
     # check existence
     srcfilepath = self.osentry.get_fp_for_fn_as_name_fsufix_ext_bksufix(self.n_ongoing_lang)
+    srcfilename = self.osentry.get_fn_as_name_fsufix_ext_bksufix(self.n_ongoing_lang)
     trgfilepath = self.osentry.fp_for_fn_as_name_fsufix_ext
-
-    if os.path.isfile(trgfilepath):
-      errmsg = f"""Error:
-      trgfile [{self.osentry.fn_as_name_fsufix_ext}] 
-        for backrename is not present in folder. It may have been moved or renamed."""
-      raise OSError(errmsg)
-    try:
-      os.rename(srcfilepath, trgfilepath)
-    except (IOError, OSError) as e:
-      errmsg = f"""Error when attempting to rename:
-      FROM: [{name_fsufix_ext_bksufix}]
-      TO:   [{self.osentry.fn_as_name_fsufix_ext}]
-      ---------------------------------------
-      => {e}
-      """
-      raise OSError(errmsg)
+    trgfilename = self.osentry.fn_as_name_fsufix_ext
+    scrmsg = f"""Rename:
+    srcfilename = {srcfilename}
+    trgfilename = {trgfilename}
+    """
+    print(scrmsg)
+    if os.path.isfile(srcfilepath) and not os.path.isfile(trgfilepath):
+      # with these 2 conditions, rename can happen
+      # errmsg = f"""Error:
+      # trgfile [{self.osentry.fn_as_name_fsufix_ext}]
+      #   for backrename is not present in the folder. it may have been moved or renamed."""
+      # raise OSError(errmsg)
+      try:
+        os.rename(srcfilepath, trgfilepath)
+      except (IOError, OSError) as e:
+        errmsg = f"""Error when attempting to rename:
+        FROM: [{name_fsufix_ext_bksufix}]
+        TO:   [{self.osentry.fn_as_name_fsufix_ext}]
+        ---------------------------------------
+        => {e}
+        """
+        raise OSError(errmsg)
+    canofilepath = self.osentry.fp_for_fn_as_name_ext
+    canofilename = self.osentry.fn_as_name_ext
+    if os.path.isfile(canofilepath):
+      scrmsg = f"""[canonical file is present, going to delete it for the next download.
+      Deleting canonical file so that yt-dlp can download the audio and blend it.
+      {canofilename}
+      {canofilepath}"""
+      print(scrmsg)
+      os.remove(canofilepath)
 
   def fallback_to_nondashed_audiocode_changing_it(self):
     """
@@ -1009,39 +1048,3 @@ if __name__ == '__main__':
   adhoc_test2()
   """
   process()
-
-
-import unittest
-
-
-class OSEntryTestCase(unittest.TestCase):
-
-  def setUp(self):
-    self.ose = OSEntry(
-      folderpath='/dir1/subdir/thislevel',
-      basefilename='this video [GypUQgXZmlQ].mp4',
-      videoonly_or_audio_code=160
-    )
-
-  def test_1(self):
-    ret_dot_ext = self.ose.dot_ext
-    exp_dot_ext = '.mp4'
-    self.assertEqual(exp_dot_ext, ret_dot_ext)
-    ret_fsufix = self.ose.fsufix
-    exp_fsufix = 'f160'
-    self.assertEqual(exp_fsufix, ret_fsufix)
-    ret_name = self.ose.name
-    exp_name = 'this video [GypUQgXZmlQ]'
-    self.assertEqual(exp_name, ret_name)
-    ret_fn = self.ose.fn_as_name_ext
-    exp_fn = 'this video [GypUQgXZmlQ].mp4'
-    self.assertEqual(exp_fn, ret_fn)
-    ret_fn = self.ose.get_fn_as_name_fsufix_ext_bksufix(3)
-    exp_fn = 'this video [GypUQgXZmlQ].f160.mp4.bk3'
-    self.assertEqual(exp_fn, ret_fn)
-    ret_fn = self.ose.get_fp_for_fn_as_name_fsufix_ext_bksufix(3)
-    exp_fn = '/dir1/subdir/thislevel/this video [GypUQgXZmlQ].f160.mp4.bk3'
-    self.assertEqual(exp_fn, ret_fn)
-    ret_ytid = self.ose.ytid
-    exp_ytid = 'GypUQgXZmlQ'
-    self.assertEqual(exp_ytid, ret_ytid)
