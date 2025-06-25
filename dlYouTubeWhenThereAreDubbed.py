@@ -107,6 +107,7 @@ import sys
 DEFAULT_AUDIOVIDEO_CODE = 160
 DEFAULT_AUDIOVIDEO_DOT_EXT = '.mp4'
 DEFAULT_YTIDS_FILENAME = 'youtube-ids.txt'
+REGISTERED_VIDEO_DOT_EXTENSIONS = ['.mp4', '.mkv', '.webm', '.m4v', '.avi', '.wmv']
 YTID_CHARSIZE = 11
 enc64_valid_chars = string.digits + string.ascii_lowercase + string.ascii_uppercase + '_-'
 # Parse command-line arguments
@@ -124,11 +125,17 @@ parser.add_argument("--audioonlycodes", type=str, default="233-0,233-1",
 args = parser.parse_args()
 
 
-def is_str_enc64(line):
+def is_str_enc64(line: str | None) -> bool:
   blist = list(map(lambda c: c in enc64_valid_chars, line))
   if False in blist:
     return False
   return True
+
+
+def is_str_a_ytid(ytid: str | None) -> bool:
+  if ytid is None or len(ytid) != YTID_CHARSIZE:
+    return False
+  return is_str_enc64(ytid)
 
 
 def read_ytids_from_default_file_n_get_as_list(p_dlddir_abspath, ytids_filename=None):
@@ -143,30 +150,18 @@ def read_ytids_from_default_file_n_get_as_list(p_dlddir_abspath, ytids_filename=
 
 
 def verify_ytid_validity_or_raise(ytid):
-  if ytid is None:
-    errmsg = 'Error: ytid cannot be empty, please reenter it.'
-    raise ValueError(errmsg)
-  is_ytid_enc64_compliant = True  # until proven contrary
-  # 1 - verify chars are ENC64
-  should_not_have_falses = list(map(lambda c: c in enc64_valid_chars, ytid))
-  size = len(str(ytid))
-  if False in should_not_have_falses:
-    is_ytid_enc64_compliant = False
-  # 2 - verify charsize is YTID_CHARSIZE (11 at the time of writing)
-  if size != YTID_CHARSIZE or not is_ytid_enc64_compliant:
+  if not is_str_a_ytid(ytid):
     errmsg = (
       f"""
-      Please check the following two problems with ytid (the {YTID_CHARSIZE}-character video id):
-      (one or the other or both)
+      Please check the value entered for/with ytid
+        => its entered value is "{ytid}"
 
-      => ytid = "{ytid}" 
+      Rules for a valid ytid:
+      =======================
+      a) it must have {YTID_CHARSIZE} characters
+      b) all of them must be ENC64 *
 
-      1 It must have {YTID_CHARSIZE} characters: {len(ytid) == YTID_CHARSIZE}: It has {size}
-
-      2 All its characters should be ENC64
-        In "{ytid}", is it ENC64? {is_ytid_enc64_compliant}
-
-      All 64 ENC64 characters are: "{enc64_valid_chars}"
+      * All 64 ENC64 characters are: "{enc64_valid_chars}"
 
       Please, correct the observations(s) above and retry.
       """
@@ -176,55 +171,173 @@ def verify_ytid_validity_or_raise(ytid):
 
 class OSEntry:
   """
-  This class organizes the OSEntries (file and folders) needs for the following Downloader
-  i.e., this class is used by composition by the latter
+  This class organizes the OSEntries (files and folders) needed for the Downloader class below
+  This class is used by composition by the latter
   """
 
-  def __init__(self, folderpath, basefilename, audiovideocode):
+  def __init__(self, folderpath, basefilename, videoonly_or_audio_code):
     self.folderpath = folderpath
+    self.name, self.dot_ext = None, None
+    self._basefilename = None
     self.basefilename = basefilename
-    self.name, self.dot_ext = os.path.splitext(self.basefilename)
-    if audiovideocode is None:
-      self.audiovideocode = DEFAULT_AUDIOVIDEO_CODE
+    if videoonly_or_audio_code is None:
+      self.videoonly_or_audio_code = DEFAULT_AUDIOVIDEO_CODE
     else:
-      self.audiovideocode = audiovideocode
-    self.dot_fsufix = f".f{self.audiovideocode}"
-    self.dot_bksufix = None
+      self.videoonly_or_audio_code = videoonly_or_audio_code
 
   @property
-  def fn_as_name_ext(self):
+  def basefilename(self):
+    """
+    basefilename is video filename as it comes from the yt-dlp
+    in this class:
+      1 - it's the same as fn_as_name_ext
+      2 - and also decomposable as "{name}{dot_ext}"
+    it could be further decomposed because of the video-id sufixing the name,
+      but that goes for a different method below (TODO)
+    :return:
+    """
+    return self.fn_as_name_ext
+
+  @basefilename.setter
+  def basefilename(self, filename):
+    self.name, self.dot_ext = os.path.splitext(filename)
+    if self.dot_ext not in REGISTERED_VIDEO_DOT_EXTENSIONS:
+      errmsg = (f"extension {self.dot_ext} not in the REGISTERED_VIDEO_DOT_EXTENSIONS"
+                f" list = {REGISTERED_VIDEO_DOT_EXTENSIONS}")
+      raise OSError(errmsg)
+
+  @property
+  def ytid(self) -> str | None:
+    """
+    The attribute is the ytid (youtube-video-id)
+
+    Important:
+      a) the way ytid is extracted here from the filename is the convention (*) used in yt-dlp
+      b) there is another convention used in the older ytdl project, this is still
+         used in some of our scripts
+      c) because this script looks up the downloaded file from yt-dlp,
+         the correct convention is the one in 'a' above
+      (*) the convention is to have the 11-char ytid enclosed within "[]" at the end of name
+    :return:
+    """
+    try:
+      sufix = self.name[-13:]
+      ytid = sufix.lstrip('[').rstrip(']')
+      if not is_str_a_ytid(ytid):
+        return None
+      return ytid
+    except (IndexError, ValueError):
+      return None
+
+  @property
+  def fsufix(self) -> str:
+    """
+    Examples of videoonlycodes are: 160 (a 256x144), 602 (another 256x144), etc.
+    A fsufix is the string "f" + str(videoonly_or_audio_code)
+    With the example above fsufix = "f160"
+    """
+    _fsufix = f"f{self.videoonly_or_audio_code}"
+    return _fsufix
+
+  @property
+  def dot_fsufix(self) -> str:
+    """
+    It prepends a "." (dot) before fsufix (@see it above)
+    """
+    _dot_fsufix = f'.{self.fsufix}'
+    return _dot_fsufix
+
+  @property
+  def fn_as_name_ext(self) -> str:
     name_ext = f"{self.name}{self.dot_ext}"
     return name_ext
 
   @property
-  def fp_for_fn_as_name_ext(self):
+  def fp_for_fn_as_name_ext(self) -> os.path:
     return os.path.join(self.folderpath, self.fn_as_name_ext)
 
   @property
-  def fn_as_name_fsufix_ext(self):
+  def fn_as_name_fsufix_ext(self) -> str:
+    """
+    name_fsufix_ext means the canonical filename with the f<videoonlycode> sufix.
+
+    An example:
+      title.f160.ext.bk3
+
+    In the example, parts after title are:
+      f160 => an "f" following by the videoonlycode
+      ext => the current extension
+      bk3 => means it's the 3rd copy of the videoonlyfile that will compose with a 3rd language audio file
+
+      Let's look at the fsufix with an example:
+            a-videofilename-ytid.f160.mp4
+      In this example, ".f160" is a videoonly sufix coming before the extension
+      (it's videoonly because videoformat code 160 is videoonly, i.e., video without audio)
+
+      So this method does the following:
+      a) it takes the canonical filename:
+        In the example:
+            a-videofilename-ytid.mp4
+      b) and grafts (inserts) the ".f160" before the extension
+        In the example:
+            a-videofilename-ytid.f160.mp4
+
+      Notice that this method does not use the other sufix in this script, the bksuffix (@see above)
+    """
     name_fsufix_ext = f"{self.name}{self.dot_fsufix}{self.dot_ext}"
     return name_fsufix_ext
 
   @property
-  def name_from_fn_as_name_fsufix_ext(self):
+  def name_from_fn_as_name_fsufix_ext(self) -> str:
     name, _ = os.path.splitext(self.fn_as_name_fsufix_ext)
     return name
 
   @property
-  def fp_for_fn_as_name_fsufix_ext(self):
+  def fp_for_fn_as_name_fsufix_ext(self) -> os.path:
     return os.path.join(self.folderpath, self.fn_as_name_ext)
 
   @staticmethod
-  def get_f_dot_bksufix(n_bksufix):
+  def get_f_dot_bksufix(n_bksufix) -> str:
+    """
+    This method composes a bksufix-fsufix audio|video filename
+    This filename is composed with the following chunks:
+      "{name}{dot_fsufix}{dot_ext}{dot_bksufix}"
+    Where:
+      {name} is the name part of the filename altogether
+      {dot_fsufix} is a dot, followed by "f" followed by the videoonlycode
+        * it could also be an audioonlycode, but in this clas, its main use aims the vocode
+      {dot_ext} is a dot followed by the file-extension
+      {dot_bksufix} is a dot, followed by "bk" followed by a sequence number
+
+    Example:
+      name = "this-video"
+      dot_fsufix = ".f160"
+      dot_ext = ".mp4"
+      dot_bksufix = ".bk3"
+    This will compose as:
+      "this-video.f160.mp4.bk3"
+    """
     _f_dot_bksufix = f".bk{n_bksufix}"
     return _f_dot_bksufix
 
-  def get_fn_as_name_fsufix_ext_bksufix(self, n_bksufix):
+  def get_fn_as_name_fsufix_ext_bksufix(self, n_bksufix) -> str:
+    """
+    An example of a filename name_fsufix_ext_bksufix is as follows:
+      it takes a fsufix video, say, videoonlycode=160 (a 256x144 video), forming:
+
+      a) filename.f160.mp4 (in the example this is self.fsufixed_videoonlyfilename)
+    and appends to it a bksufix, say:
+      b) filename.f160.mp4.bk2
+
+    Notice that the forming also considers the dirpath, in a nutshell, the forming is:
+      a) INPUT: <dirabspath>/filename.f160.mp4
+      b) OUTPUT: <dirabspath>/filename.f160.mp4.bk2
+    """
     name_fsufix_ext_bksufix = f"{self.fn_as_name_fsufix_ext}{self.get_f_dot_bksufix(n_bksufix)}"
     return name_fsufix_ext_bksufix
 
-  def get_fp_for_fn_as_name_fsufix_ext_bksufix(self, n_bksufix):
-    os.path.join(self.folderpath, self.get_fn_as_name_fsufix_ext_bksufix(n_bksufix))
+  def get_fp_for_fn_as_name_fsufix_ext_bksufix(self, n_bksufix) -> os.path:
+    return os.path.join(self.folderpath, self.get_fn_as_name_fsufix_ext_bksufix(n_bksufix))
 
   def __str__(self):
     bksufix_example = 3
@@ -233,7 +346,7 @@ class OSEntry:
     fp_name_ext = {self.fp_for_fn_as_name_ext}
     --------------------------------
     name_fsufix_ext = {self.fn_as_name_fsufix_ext}
-    fp_name_fsufix_ext = {self.fp_fn_as_name_fsufix_ext}
+    fp_name_fsufix_ext = {self.fp_for_fn_as_name_fsufix_ext}
     --------------------------------
     Example with bksufix = {bksufix_example}
     name_fsufix_ext_bksufix[{bksufix_example}] = {self.get_fn_as_name_fsufix_ext_bksufix(bksufix_example)}
@@ -248,7 +361,7 @@ class Downloader:
   DEFAULT_VIDEO_ONLY_CODE = 160
   DEFAULT_AUDIO_ONLY_CODES = ['233-0', '233-1']
   videodld_tmpdirname = 'videodld_tmpdir'
-  video_dot_extensions = ['.mp4', '.mkv', '.webm', '.m4v', '.avi', '.wmv']
+  video_dot_extensions = REGISTERED_VIDEO_DOT_EXTENSIONS
   DEFAULT_DOT_EXTENSION = '.mp4'
   # class-wide static interpolable-string constants
   comm_line_base = 'yt-dlp -w -f {compositecode} "{videourl}"'
@@ -272,8 +385,12 @@ class Downloader:
     self.cur_dot_ext = self.DEFAULT_DOT_EXTENSION
     self.previously_existing_filenames_in_tmpdir = []
     self.n_ongoing_lang = 0
-    self.vo_osentry = None  # later on OSEntry()
-    self.va_osentry = []
+    self.osentry = OSEntry(
+      folderpath=self.child_tmpdir_abspath,
+      basefilename=None,  # later to be known
+      videoonly_or_audio_code=self.videoonlycode
+    )
+    # self.va_osentry = []
 
   def treat_input(self):
     verify_ytid_validity_or_raise(self.ytid)
@@ -289,90 +406,6 @@ class Downloader:
       self.audioonlycodes = self.DEFAULT_AUDIO_ONLY_CODES
 
   @property
-  def fn_as_name_fsufix_ext(self):
-    self.osentry.fn_as_name_fsufix_ext
-
-  @property
-  def fsufixed_videoonlyfilename(self):
-    """
-    fsufixed_videoonlyname means the canonical filename with the f<videoonlycode> sufix.
-    An example:
-      title.f160.ext.bk3
-
-    In the example, parts after title are:
-      f160 => an "f" following by the videoonlycode    
-      ext => the current extension
-      bk3 => means it's the 3rd copy of the videoonlyfile that will compose with a 3rd language audio file
-
-      Let's look at the fsufix with an example:
-            a-videofilename-ytid.f160.mp4
-      In this example, ".f160" is a videoonly sufix coming before the extension
-      (it's videoonly because videoformat code 160 is videoonly, i.e., video without audio)
-
-      So this method does the following:
-      a) it takes the canonical filename:
-        In the example:
-            a-videofilename-ytid.mp4
-      b) and grafts (inserts) the ".f160" before the extension
-        In the example:
-            a-videofilename-ytid.f160.mp4
-
-      Notice that this method does not use the other sufix in this script, the bksuffix (@see above)
-    """
-    fsufix = f"{self.videoonlycode}"
-    _fixed_videoonlyfilename = f"{self.video_canonical_name}{fsufix}{self.cur_dot_ext}"
-    return _fixed_videoonlyfilename
-
-  @property
-  def fsufixed_videoonlyfilepath(self):
-    return os.path.join(self.child_tmpdir_abspath, self.fsufixed_videoonlyfilename)
-
-  @property
-  def cur_dot_ext(self):
-    """
-    current dot extension (example .mp4, .mkv, etc.)
-    """
-    return self._cur_dot_ext
-
-  @cur_dot_ext.setter
-  def cur_dot_ext(self, p_dot_ext):
-    """
-    current dot extension (example .mp4, .mkv, etc.)
-    """
-    if p_dot_ext in self.video_dot_extensions:
-      self._cur_dot_ext = p_dot_ext
-      return
-    errmsg = f"{p_dot_ext} is not a video filename extension register. These are {self.video_dot_extensions}"
-    raise ValueError(errmsg)
-
-  @property
-  def fn_name_ext(self):
-    _video_canonical_filename = f"{self.video_canonical_name}{self.cur_dot_ext}"
-    return _video_canonical_filename
-
-  @fn_name_ext.setter
-  def fn_name_ext(self, filename):
-    return self.osentry.fn_as_name_ext
-
-  @property
-  def fp_for_fn_name_ext(self):
-    return self.osentry.fpfn_as_name_ext
-
-  def get_video_or_audio_filename_with_bksufix(self, n_for_bksufix):
-    """
-    Example:
-      'a-videofilename-ytid.f160.mp4.bk3'
-      bk3 means that it is the 3rd copy of a-videofilename-ytid.f160.mp4
-        and is to be used to complement the 3rd audio language file
-
-      Notice that pre-sufix f160 in the example above is a videoonly sufix coming before the extension,
-        this latter sufix is different and is nicknamed fsufix
-    """
-    bksufix = f".bk{n_for_bksufix}"
-    videofilename_w_bksufix = self.fn_as_name_fsufix_ext + bksufix
-    return videofilename_w_bksufix
-
-  @property
   def n_langs(self):
     if self.audioonlycodes is None:
       return 0
@@ -383,23 +416,6 @@ class Downloader:
     pdict = {'ytid': self.ytid}
     url = self.video_baseurl.format(**pdict)
     return url
-
-  def form_bksufixed_videofilepath_basedonthefsufixvideo(self, nth) -> os.path:
-    """
-    An example this method does the following: it takes a fsufix video, say:
-      a) filename.f160.mp4 (in the example this is self.fsufixed_videoonlyfilename)
-    and appends to it a bksufix, say:
-      b) filename.f160.mp4.bk2
-
-    Notice that the forming also considers the dirpath, in a nutshell, the forming is:
-      a) INPUT: <dirabspath>/filename.f160.mp4
-      b) OUTPUT: <dirabspath>/filename.f160.mp4.bk2
-    :param nth:
-    :return:
-    """
-    dot_bksufix = f".bk{nth}"
-    next_filename = self.fn_as_name_fsufix_ext + dot_bksufix
-    return os.path.join(self.child_tmpdir_abspath, next_filename)
 
   def copy_n_rename_videoonly_n_lang_times(self):
     """
@@ -413,38 +429,38 @@ class Downloader:
       for i in range(1, self.n_langs):
         lang_seq = i + 1
         audiocode = self.audioonlycodes[lang_seq-1]
-        trg_filepath = self.form_bksufixed_videofilepath_basedonthefsufixvideo(lang_seq)
+        trg_filepath = self.osentry.get_fp_for_fn_as_name_fsufix_ext_bksufix(lang_seq)
         if os.path.isfile(trg_filepath):
           scrmsg = f"""lang={lang_seq} audiocode={audiocode}
-           fsufixed_videoonlyfilename =  {self.fn_as_name_fsufix_ext}
+           name_vofsufix_ext =  {self.osentry.fn_as_name_fsufix_ext}
            HAS ALREADY BEEN COPIED (for complementing later on) to {trg_filepath}"""
           print(scrmsg)
           continue
-        shutil.copy2(self.fsufixed_videoonlyfilepath, trg_filepath)
+        shutil.copy2(self.osentry.fp_for_fn_as_name_fsufix_ext, trg_filepath)
         scrmsg = f"""lang={lang_seq} audiocode={audiocode}
-         fsufixed_videoonlyfilename =  {self.fn_as_name_fsufix_ext}
-         COPIED (for complementing later on) to {trg_filepath}"""
+         name_vofsufix_ext =  {self.osentry.fn_as_name_fsufix_ext}
+         COPIED (for later a+v blending) to {trg_filepath}"""
         print(scrmsg)
     # rename "bk1" at last
     lang_seq = 1
     audiocode = self.audioonlycodes[lang_seq - 1]
-    trg_filepath = self.form_bksufixed_videofilepath_basedonthefsufixvideo(lang_seq)
+    trg_filepath = self.osentry.get_fp_for_fn_as_name_fsufix_ext_bksufix(lang_seq)
     if os.path.isfile(trg_filepath):
       scrmsg = f"""lang={lang_seq} audiocode={audiocode}
-       fsufixed_videoonlyfilename =  {self.fn_as_name_fsufix_ext}
+       name_vofsufix_ext =  {self.osentry.fn_as_name_fsufix_ext}
        HAS ALREADY BEEN RENAMED (for complementing later on) to {trg_filepath}"""
       print(scrmsg)
       return
     try:
-      os.rename(self.fsufixed_videoonlyfilepath, trg_filepath)
+      os.rename(self.osentry.fn_as_name_fsufix_ext, trg_filepath)
       scrmsg = f"""lang={lang_seq} audiocode={audiocode}
-       fsufixed_videoonlyfilename =  {self.fn_as_name_fsufix_ext}
+       fsufixed_videoonlyfilename =  {self.osentry.fn_as_name_fsufix_ext}
        RENAMED (for complementing later on) to {trg_filepath}"""
       print(scrmsg)
     except (IOError, OSError) as e:
       errmsg = f"""Error when attempting to rename
       bksufix lang={lang_seq} audiocode={audiocode} 
-      to the fsufixed_videoonlyfilename as: [{self.fn_as_name_fsufix_ext}]
+      to the fsufixed_videoonlyfilename as: [{self.osentry.fn_as_name_fsufix_ext}]
       => {e}
       """
       raise OSError(errmsg)
@@ -491,22 +507,6 @@ class Downloader:
       self.verify_tmpdir_once_n_store_files_already_existing(tmpdir_abspath)
     return tmpdir_abspath
 
-  @property
-  def fsufix(self) -> str:
-    """
-    Examples of videoonlycodes are: 160 (a 256x144), 602 (another 256x144), etc.
-    """
-    _fsufix = f"f{self.videoonlycode}"
-    return _fsufix
-
-  @property
-  def dot_fsufix(self) -> str:
-    """
-    Examples of videoonlycodes are: 160 (a 256x144), 602 (another 256x144), etc.
-    """
-    _dot_fsufix = f'.{self.fsufix}'
-    return _dot_fsufix
-
   def fallbackcase_ask_user_what_the_downloaded_filename_is(self):
     scrmsg = f"""Script was not able to find the downloaded filename,
      this can happen when the download had alread happened before,
@@ -538,7 +538,7 @@ class Downloader:
       sys.exit(1)
     return filename
 
-  def discover_dld_videofilename(self):
+  def discover_dldd_videofilename(self):
     """
     Because a temporary dir is created for the download,
       one expects there will be only one videofile (*) after the first download happens
@@ -574,16 +574,8 @@ class Downloader:
       videofilename_soughtfor = self.fallbackcase_ask_user_what_the_downloaded_filename_is()
     else:
       videofilename_soughtfor = videofilenames_appearing_after[0]
-    self.set_osentry_with_discovered_vofn(videofilename_soughtfor)
-
-  def set_osentry_with_discovered_vofn(self, videofilename_soughtfor):
-    self.osentry = OSEntry(
-      folderpath=self.child_tmpdir_abspath,
-      basefilename=videofilename_soughtfor,
-      audiovideocode=self.videoonlycode
-    )
-    self.fn_name_ext = videofilename_soughtfor
-    scrmsg = f"Discovered videofilename after download: [{self.fn_name_ext}]"
+    self.osentry.basefilename = videofilename_soughtfor
+    scrmsg = f"Discovered videofilename after download: [{self.osentry.fn_as_name_ext}]"
     print(scrmsg)
 
   def rename_from_canonical_to_fsufixedvideoonlyfile(self) -> bool:
@@ -600,19 +592,19 @@ class Downloader:
            the former [bksufix] with the latter [fsufix]
            and this bksufix is not used in this method
     """
-    if os.path.isfile(self.fsufixed_videoonlyfilepath):
-      srcmsg = f"""Not renaming to fsufixed_videoonlyfilename [{self.fn_name_ext}] as it already exists.
-      Continuing."""
+    if os.path.isfile(self.osentry.fp_for_fn_as_name_fsufix_ext):
+      srcmsg = f"""Not renaming to fsufixed_videoonlyfilename [{self.osentry.fn_as_name_fsufix_ext}]
+       as it already exists. Continuing."""
       print(srcmsg)
       return False
     try:
-      os.rename(self.fp_for_fn_name_ext, self.fsufixed_videoonlyfilepath)
+      os.rename(self.osentry.fp_for_fn_as_name_ext, self.osentry.fp_for_fn_as_name_fsufix_ext)
       return True
     except (IOError, OSError) as e:
       errmsg = f"""Error when attempting to rename
       canonical to fsufixed_videoonlyfilename i.e.,
-      FROM : [{self.fn_name_ext}]
-      TO   : [{self.fsufixed_videoonlyfilename}]
+      FROM : [{self.osentry.fn_as_name_ext}]
+      TO   : [{self.osentry.fn_as_name_fsufix_ext}]
       => {e}
       """
       raise OSError(errmsg)
@@ -650,34 +642,24 @@ class Downloader:
       print(scrmsg)
     return True
 
-  def form_stocked_videoonlyfilename_w_fsufix_n_bksufix(self, nsufix):
-    """
-    This method is not in use (with the IDE, clicking it goes nowhere),
-      but a future refactoring may put this in use
-    """
-    dot_bksufix = f".bk{nsufix}"
-    vofilename_w_fsufix_n_bksufix = f"{self.video_canonical_name}{self.dot_fsufix}{self.cur_dot_ext}{dot_bksufix}"
-    return vofilename_w_fsufix_n_bksufix
-
   def find_existfilepath_of_samecanonicalfilename_w_different_ext_or_none(self):
     """
-    It's already known at this point that the canonical filepath
-      (self.video_canonical_filepath)
+    At this point the canonical filepath (with the name created by yt-dlp)
       is not present in dir.
-    Chances are that its extension is now a different.
-    Example: instead of mp4, it's not mkv
-      (the blending of audio+video may change a previous extension)
+    Chances are its extension got changed with a different combination of audio & video fusion.
+
+    Example: instead of mp4, it may now be mkv
+      (the blending of audio+video may have changed a previous extension)
+
     This method tries to find a same canonical name with a different extension
 
-    # at this point, it did not return, the canonical name combined with the video extensions is not present in dir
-    errmsg = (fError: canonical file [{self.video_canonical_filename}] is not present in dir
-              ffor the langN prefix prepending rename. Script cannot continue,
-              fbut the last video downloaded is probably complete on folder. Halting.)
-    raise OSError(errmsg)
+    Obs:
+      a) the approach this method tries is to look up different extensions with the same name
+      b) another approach would be to try to use the ytid itself sufixed to name
 
     """
-    canoname = self.video_canonical_name
-    curr_dot_ext = self.cur_dot_ext
+    canoname = self.osentry.fn_as_name_ext
+    curr_dot_ext = self.osentry.dot_ext
     extensions = list(self.video_dot_extensions)
     try:
       # remove the extension it already has, go look up a matching one among the remaining ones
@@ -695,32 +677,6 @@ class Downloader:
         self.cur_dot_ext = next_dot_ext
         return soughtfor_alt_filepath
     return None
-
-  def get_fn_as_name_fsufix_ext_bksufix(self):
-    """
-    This method composes a bksufix-fsufix audio|video filename
-    This filename is composed with the following chunks:
-      "{name}{dot_fsufix}{dot_ext}{dot_bksufix}"
-    Where:
-      {name} is the name part of the filename altogether
-      {dot_fsufix} is a dot, followed by "f" followed by the videoonlycode
-        * it could also be an audioonlycode, but in this clas, its main use aims the vocode
-      {dot_ext} is a dot followed by the file-extension
-      {dot_bksufix} is a dot, followed by "bk" followed by a sequence number
-
-    Example:
-      name = "this-video"
-      dot_fsufix = ".f160"
-      dot_ext = ".mp4"
-      dot_bksufix = ".bk3"
-    This will compose as:
-      "this-video.f160.mp4.bk3"
-    """
-    fsufixed_vofilename = self.fsufixed_videoonlyfilename
-    n_for_bksufix = self.n_ongoing_lang
-    dot_bksufix = f".f{n_for_bksufix}"
-    name_fsufix_ext_bksufix = f"{fsufixed_vofilename}{dot_bksufix}"
-    return name_fsufix_ext_bksufix
 
   def rename_bksufixedfile_backtovideoonlyfilename_sothatitcancomposite(self):
     """
@@ -750,23 +706,26 @@ class Downloader:
         filename-video-such-and-such-ytid.mkv
       then, with the name part of the filename, the mkv one -- in another one in the set -- may be found.
     """
-    name_fsufix_ext_bksufix = self.fn_as_name_fsufix_ext_bksufix
-    scrmsg = f"""bksufix = .bk{n_for_bksufix} | renaming:
+    name_fsufix_ext_bksufix = self.osentry.get_fn_as_name_fsufix_ext_bksufix(self.n_ongoing_lang)
+    scrmsg = f"""bksufix = .bk{self.n_ongoing_lang} | renaming:
     FROM:   {name_fsufix_ext_bksufix}
-    TO:   {self.fsufixed_videoonlyfilename}"""
+    TO:   {self.osentry.fn_as_name_fsufix_ext}"""
     print(scrmsg)
     # check existence
-    srcfilepath = os.path.join(self.child_tmpdir_abspath, videoonly_filename_w_bksufix)
-    trgfilepath = os.path.join(self.child_tmpdir_abspath, self.fn_as_name_fsufix_ext)
+    srcfilepath = self.osentry.get_fp_for_fn_as_name_fsufix_ext_bksufix(self.n_ongoing_lang)
+    trgfilepath = self.osentry.fp_for_fn_as_name_fsufix_ext
+
     if os.path.isfile(trgfilepath):
-      errmsg = f"Error: trgfile [{self.fn_as_name_fsufix_ext}] for backrename should not be present at this point."
+      errmsg = f"""Error:
+      trgfile [{self.osentry.fn_as_name_fsufix_ext}] 
+        for backrename is not present in folder. It may have been moved or renamed."""
       raise OSError(errmsg)
     try:
       os.rename(srcfilepath, trgfilepath)
     except (IOError, OSError) as e:
       errmsg = f"""Error when attempting to rename:
-      FROM: [{videoonly_filename_w_bksufix}]
-      TO:   [{self.fn_name_ext}]
+      FROM: [{name_fsufix_ext_bksufix}]
+      TO:   [{self.osentry.fn_as_name_fsufix_ext}]
       ---------------------------------------
       => {e}
       """
@@ -808,7 +767,7 @@ class Downloader:
       Returning."""
       print(scrmsg)
 
-  def download_audiopart_to_fuse_w_videoonly(self):
+  def download_audiopart_to_blend_it_w_videoonly(self):
     """
     One caution here:
       the videoonly_canonical_filename (the one without sufixes) should not be present,
@@ -818,10 +777,10 @@ class Downloader:
     """
     self.rename_bksufixedfile_backtovideoonlyfilename_sothatitcancomposite()  # it's done by removing number sufix
     # now, after the previous rename, the above caution in the docstr can be checked
-    if os.path.isfile(self.fp_for_fn_name_ext):
+    if os.path.isfile(self.osentry.fp_for_fn_as_name_ext):
       # oh, oh error
       errmsg = f"""Error:
-      the canonical_videoonly_filename [{self.fn_name_ext}] should not be present in dir,
+      the canonical_videoonly_filename [{self.osentry.fn_as_name_ext}] should not be present in dir,
       otherwise yt-dlp will deduce that the audio+video composite has already happened which it doesn't yet.
       
       The user should check whether this file is the final one or
@@ -870,21 +829,24 @@ class Downloader:
       video_canonical_filename is wrongly taking the fsufix (ex f160)
       after the first fusion (i.e., the download of the first audio and formation of the 1st lang video)
     """
-    langprefixfilename = f"lang{self.n_ongoing_lang} " + self.fn_name_ext
+    audioonlycode = self.audioonlycodes[self.n_ongoing_lang-1]
+    langprefix = f"lang{self.n_ongoing_lang}_{audioonlycode}"
+    langprefixfilename = f"{langprefix} {self.osentry.fn_as_name_ext}"
     trg_filepath = os.path.join(self.child_tmpdir_abspath, langprefixfilename)
-    audiocode = self.audioonlycodes[self.n_ongoing_lang - 1]
-    scrmsg = f"""lang={self.n_ongoing_lang} | audiocode={audiocode} | renaming:
-    FROM: {self.fn_name_ext}
+    scrmsg = f"""lang={self.n_ongoing_lang} | audiocode={audioonlycode} | renaming:
+    FROM: {self.osentry.fn_as_name_ext}
     TO:   {langprefixfilename}
     """
     print(scrmsg)
-    canofilepath = self.fp_for_fn_name_ext
-    if not os.path.isfile(self.fp_for_fn_name_ext):
+    canofilepath = self.osentry.fp_for_fn_as_name_ext
+    if not os.path.isfile(canofilepath):
       canofilepath = self.find_existfilepath_of_samecanonicalfilename_w_different_ext_or_none()
       if canofilepath is None:
         # can't rename
-        wrnmsg = (f"Cannot rename canonical filename {self.fn_name_ext}"
-                  f"  to {langprefixfilename}.\n  It's not present in folder.")
+        wrnmsg = f"""Cannot rename canonical filename:
+          FROM: "{canofilepath}"
+          (TO:   "{langprefixfilename}")
+        It's not present in folder."""
         print(wrnmsg)
     os.rename(canofilepath, trg_filepath)
 
@@ -893,7 +855,7 @@ class Downloader:
     self.n_on_going_lang is an instance variable that controls lang orderseq throughout the class
     """
     for self.n_ongoing_lang in range(1, self.n_langs + 1):
-      self.download_audiopart_to_fuse_w_videoonly()
+      self.download_audiopart_to_blend_it_w_videoonly()
       self.rename_videofile_after_audiovideofusion()
 
   def process(self):
@@ -919,7 +881,7 @@ class Downloader:
     DISCOVER the downloaded video's filename (with ytid={self.ytid}) and rename it to the videoonlyfile
              that one will serve the audio files to later compose audio+video"""
     print(scrmsg)
-    self.discover_dld_videofilename()
+    self.discover_dldd_videofilename()
     self.rename_from_canonical_to_fsufixedvideoonlyfile()
     scrmsg = f"""4th step ->
     COPY it  (with ytid={self.ytid}) to as many as there are audio lang entered"""
@@ -932,15 +894,11 @@ class Downloader:
     # move all videos from child_tmpdir_abspath to its parent dir
 
 
-def adhoctest1():
-  pass
-
-
-def adhoctest2():
+def adhoc_test2():
   dirpath = args.dirpath or os.path.abspath('.')
   # inputfilepath = os.path.join(dirpath, DEFAULT_YTIDS_FILENAME)
   ytids = read_ytids_from_default_file_n_get_as_list(dirpath)
-  scrmsg = f"adhoctest2 :: ytids = {ytids}"
+  scrmsg = f"adhoc_test2 :: ytids = {ytids}"
   print(scrmsg)
 
 
@@ -1048,7 +1006,42 @@ if __name__ == '__main__':
     dlYouTubeWhenThereAreDubbed.py ----useinputfile   
 
   adhoc_test1()
-  adhoctest2()
+  adhoc_test2()
   """
   process()
 
+
+import unittest
+
+
+class OSEntryTestCase(unittest.TestCase):
+
+  def setUp(self):
+    self.ose = OSEntry(
+      folderpath='/dir1/subdir/thislevel',
+      basefilename='this video [GypUQgXZmlQ].mp4',
+      videoonly_or_audio_code=160
+    )
+
+  def test_1(self):
+    ret_dot_ext = self.ose.dot_ext
+    exp_dot_ext = '.mp4'
+    self.assertEqual(exp_dot_ext, ret_dot_ext)
+    ret_fsufix = self.ose.fsufix
+    exp_fsufix = 'f160'
+    self.assertEqual(exp_fsufix, ret_fsufix)
+    ret_name = self.ose.name
+    exp_name = 'this video [GypUQgXZmlQ]'
+    self.assertEqual(exp_name, ret_name)
+    ret_fn = self.ose.fn_as_name_ext
+    exp_fn = 'this video [GypUQgXZmlQ].mp4'
+    self.assertEqual(exp_fn, ret_fn)
+    ret_fn = self.ose.get_fn_as_name_fsufix_ext_bksufix(3)
+    exp_fn = 'this video [GypUQgXZmlQ].f160.mp4.bk3'
+    self.assertEqual(exp_fn, ret_fn)
+    ret_fn = self.ose.get_fp_for_fn_as_name_fsufix_ext_bksufix(3)
+    exp_fn = '/dir1/subdir/thislevel/this video [GypUQgXZmlQ].f160.mp4.bk3'
+    self.assertEqual(exp_fn, ret_fn)
+    ret_ytid = self.ose.ytid
+    exp_ytid = 'GypUQgXZmlQ'
+    self.assertEqual(exp_ytid, ret_ytid)
