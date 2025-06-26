@@ -175,8 +175,8 @@ class OSEntry:
   This class is used by composition by the latter
   """
 
-  def __init__(self, folderpath, basefilename, videoonly_or_audio_code):
-    self.folderpath = folderpath
+  def __init__(self, workdir_abspath, basefilename, videoonly_or_audio_code):
+    self.workdir_abspath = workdir_abspath
     self.name, self.dot_ext = None, None
     self._basefilename = None
     self.basefilename = basefilename
@@ -257,7 +257,7 @@ class OSEntry:
 
   @property
   def fp_for_fn_as_name_ext(self) -> os.path:
-    return os.path.join(self.folderpath, self.fn_as_name_ext)
+    return os.path.join(self.workdir_abspath, self.fn_as_name_ext)
 
   @property
   def fn_as_name_fsufix_ext(self) -> str:
@@ -292,15 +292,22 @@ class OSEntry:
 
   @property
   def name_from_fn_as_name_fsufix_ext(self) -> str:
+    """
+    For example:
+      name:
+        from "a-videofilename-ytid.f160.mp4"
+          is "a-videofilename-ytid.f160"
+    :return:
+    """
     name, _ = os.path.splitext(self.fn_as_name_fsufix_ext)
     return name
 
   @property
   def fp_for_fn_as_name_fsufix_ext(self) -> os.path:
-    return os.path.join(self.folderpath, self.fn_as_name_ext)
+    return os.path.join(self.workdir_abspath, self.fn_as_name_fsufix_ext)
 
   @staticmethod
-  def get_f_dot_bksufix(n_bksufix) -> str:
+  def get_dot_bksufix(n_bksufix) -> str:
     """
     This method composes a bksufix-fsufix audio|video filename
     This filename is composed with the following chunks:
@@ -320,8 +327,8 @@ class OSEntry:
     This will compose as:
       "this-video.f160.mp4.bk3"
     """
-    _f_dot_bksufix = f".bk{n_bksufix}"
-    return _f_dot_bksufix
+    _dot_bksufix = f".bk{n_bksufix}"
+    return _dot_bksufix
 
   def get_fn_as_name_fsufix_ext_bksufix(self, n_bksufix) -> str:
     """
@@ -336,40 +343,47 @@ class OSEntry:
       a) INPUT: <dirabspath>/filename.f160.mp4
       b) OUTPUT: <dirabspath>/filename.f160.mp4.bk2
     """
-    name_fsufix_ext_bksufix = f"{self.fn_as_name_fsufix_ext}{self.get_f_dot_bksufix(n_bksufix)}"
+    name_fsufix_ext_bksufix = f"{self.fn_as_name_fsufix_ext}{self.get_dot_bksufix(n_bksufix)}"
     return name_fsufix_ext_bksufix
 
   def get_fp_for_fn_as_name_fsufix_ext_bksufix(self, n_bksufix) -> os.path:
-    return os.path.join(self.folderpath, self.get_fn_as_name_fsufix_ext_bksufix(n_bksufix))
+    return os.path.join(self.workdir_abspath, self.get_fn_as_name_fsufix_ext_bksufix(n_bksufix))
 
   def rename_canofile_to_next_available_lang_n_prefixed_or_raise(self):
     """
     This method renames existing canofile to the next available langN prefix
     if prefix gets greater than 1000, raise an exception
     """
-    canofile = self.fp_for_fn_as_name_ext
-    if not os.path.isfile(canofile):
+    canofilepath = self.fp_for_fn_as_name_ext
+    if not os.path.isfile(canofilepath):
       # nothing to do, return
       return
-    changing_filepath = canofile
     n_iter, max_iter = 0, 1000
+    changing_filepath = canofilepath
     while os.path.isfile(changing_filepath):
       n_iter += 1
       if n_iter > max_iter:
         errmsg = f"Maximum iteration cycles reaches when trying to rename {canofile} {changing_filepath}"
         raise OSError(errmsg)
+      _, changing_filename = os.path.split(canofilepath)
       prefix = f"lang{n_iter} "
-      _, changing_filename = os.path.split(changing_filepath)
-      if changing_filename.startswith(prefix):
-        pp = changing_filename.split(' ')
-        changing_filename = ' '.join(pp[1])
-      else:
-        changing_filename = prefix + changing_filename
-      changing_filepath = os.path.join(self.folderpath, changing_filename)
+      changing_filename = prefix + changing_filename
+      changing_filepath = os.path.join(self.workdir_abspath, changing_filename)
     try:
-      os.rename(canofile, changing_filepath)
+      os.rename(canofilepath, changing_filepath)
+      scrmsg = f"""Rename succeeded for incrementing langN prefix to canofile
+      ---------------------------------------
+      FROM (canofilepath):    [{canofilepath}]
+      TO (changing_filepath): [{changing_filepath}]
+      ---------------------------------------
+      """
+      print(scrmsg)
     except (OSEntry, IOError) as e:
       errmsg = f"""Error: could not rename canofile to next available prefix
+      ---------------------------------------
+      FROM (canofilepath):    [{canofilepath}]
+      TO (changing_filepath): [{changing_filepath}]
+      ---------------------------------------
       {e}
       Halting.    
       """
@@ -424,7 +438,7 @@ class Downloader:
     self.previously_existing_filenames_in_tmpdir = []
     self.n_ongoing_lang = 0
     self.osentry = OSEntry(
-      folderpath=self.child_tmpdir_abspath,
+      workdir_abspath=self.child_tmpdir_abspath,
       basefilename=None,  # later to be known
       videoonly_or_audio_code=self.videoonlycode
     )
@@ -580,8 +594,11 @@ class Downloader:
   @property
   def child_tmpdir_abspath(self):
     """
-    The actions/tasks of the script happen in a newly created directory
+    The actions/tasks of the script happen in a newly created (intended to be temporary) directory
       (or if previously created, files should have a previous-date prefix, otherwise this script should be interrupted)
+
+    The composition-class OSEntry also has it from here
+    To avoid an "origins" bug, it may be advisable to always read it from OSEntry (though the two are the same)
     :return:
     """
     tmpdir_abspath = os.path.join(self.dlddir_abspath, self.videodld_tmpdirname)
@@ -594,7 +611,7 @@ class Downloader:
      this can happen when the download had alread happened before,
      please check whether one can be found in the tmpdir and enter it here
      ---------------------------------------------------------------------
-     the tmpdir to look up is [{self.child_tmpdir_abspath}]
+     the tmpdir to look up is [{self.osentry.workdir_abspath}]
      ---------------------------------------------------------------------
      In case one cannot be found, type [ENTER] to stop script and
      restart it back up after cleaning up tmpdir (ie leaving the directory empty without files)
@@ -605,11 +622,11 @@ class Downloader:
       sys.exit(1)
     # check entered filename
     filename = ans
-    filepath = os.path.join(self.child_tmpdir_abspath, filename)
+    filepath = os.path.join(self.osentry.workdir_abspath, filename)
     if not os.path.isfile(filepath):
       errmsg = f"""Error:
       entered filename "{filename}" does not exist in tmpdir:
-      tmpdir = {self.child_tmpdir_abspath}'
+      tmpdir = {self.osentry.workdir_abspath}'
       Please, emtpy this tmpdir directory and retry this program.
       (From an empty dir, script will be able to find the correct downloaded filename.)
       If it tmpdir was already empty, the following two actions may be looked up at:
@@ -625,7 +642,7 @@ class Downloader:
     The old discovery method was based on a comparison before versus after.
     This new one is based on searching for a file with ytid in its name.
     """
-    filenames = os.listdir(self.child_tmpdir_abspath)
+    filenames = os.listdir(self.osentry.workdir_abspath)
     filenames = filter(lambda f: self.ytid in f, filenames)
     filenames = list(filter(lambda f: f.endswith(tuple(self.video_dot_extensions)), filenames))
     if len(filenames) == 1:
@@ -773,14 +790,14 @@ class Downloader:
       next_dot_ext = extensions.pop()
       # recompose filename with new extension
       soughtfor_alt_filename = f"{canoname}{next_dot_ext}"
-      soughtfor_alt_filepath = os.path.join(self.child_tmpdir_abspath, soughtfor_alt_filename)
+      soughtfor_alt_filepath = os.path.join(self.osentry.workdir_abspath, soughtfor_alt_filename)
       if os.path.isfile(soughtfor_alt_filepath):
         # found it
         self.cur_dot_ext = next_dot_ext
         return soughtfor_alt_filepath
     return None
 
-  def rename_bksufixedfile_backtovideoonlyfilename_sothatitcancomposite(self):
+  def rename_bksufixedfilename_to_fsufixedfilename_to_avoid_the_vo_redownload(self):
     """
     The supposed videofilename is videobasefilename (*) minus its number sufix
     (*) reminding that the videopart (the audioless video) is only downloaded once,
@@ -808,42 +825,67 @@ class Downloader:
         filename-video-such-and-such-ytid.mkv
       then, with the name part of the filename, the mkv one -- in another one in the set -- may be found.
     """
-    name_fsufix_ext_bksufix = self.osentry.get_fn_as_name_fsufix_ext_bksufix(self.n_ongoing_lang)
-    scrmsg = f"""bksufix = .bk{self.n_ongoing_lang} | renaming:
-    FROM:   {name_fsufix_ext_bksufix}
-    TO:   {self.osentry.fn_as_name_fsufix_ext}"""
-    print(scrmsg)
-    # check existence
     srcfilepath = self.osentry.get_fp_for_fn_as_name_fsufix_ext_bksufix(self.n_ongoing_lang)
     srcfilename = self.osentry.get_fn_as_name_fsufix_ext_bksufix(self.n_ongoing_lang)
     trgfilepath = self.osentry.fp_for_fn_as_name_fsufix_ext
     trgfilename = self.osentry.fn_as_name_fsufix_ext
-    scrmsg = f"""Rename (bksufix back to fsufix for next download):
-      ---------------------------------------
-      srcfilename = {srcfilename}
-      trgfilename = {trgfilename}
-      ---------------------------------------
+    scrmsg = f"""bksufix = .bk{self.n_ongoing_lang} | renaming it to fsufix {self.osentry.fsufix}:
+    ----------------------------------
+    FROM (bksufix):  [{srcfilename}]
+    TO    (fsufix):  [{trgfilename}]
+    ----------------------------------
     """
     print(scrmsg)
-    if os.path.isfile(srcfilepath) and not os.path.isfile(trgfilepath):
-      # with these 2 conditions, rename can happen
-      # errmsg = f"""Error:
-      # trgfile [{self.osentry.fn_as_name_fsufix_ext}]
-      #   for backrename is not present in the folder. it may have been moved or renamed."""
-      # raise OSError(errmsg)
-      try:
-        os.rename(srcfilepath, trgfilepath)
-      except (IOError, OSError) as e:
-        errmsg = f"""Error when attempting to rename:
+    # check existence
+    if not os.path.isfile(srcfilepath):
+      errmsg = f"""For the rename above
+      ---------------------------------------
+      FROM (bksufix):  [{srcfilename}]
+      ---------------------------------------
+        => is missing. Halting.
+      """
+      print(errmsg)
+      sys.exit(1)
+    if os.path.isfile(trgfilepath):
+      if os.path.isfile(srcfilepath):
+        # only the target should continue on folder
+        errmsg = f"""For the rename above
         ---------------------------------------
-        FROM: [{name_fsufix_ext_bksufix}]
-        TO:   [{self.osentry.fn_as_name_fsufix_ext}]
+        *** deleting (bksufix):  [{srcfilename}]
+            existing (fsufix) :  [{trgfilename}]
         ---------------------------------------
-        => {e}
-        Halting.
+          => reason: both files exist.
         """
         print(errmsg)
-        sys.exit(1)
+        os.remove(srcfilepath)
+      return
+    # if not os.path.isfile(trgfilepath):
+    # with these 2 conditions, rename can happen
+    # errmsg = f"""Error:
+    # trgfile [{self.osentry.fn_as_name_fsufix_ext}]
+    #   for backrename is not present in the folder. it may have been moved or renamed."""
+    # raise OSError(errmsg)
+    try:
+      os.rename(srcfilepath, trgfilepath)
+      scrmsg = f"""Rename succeeded:
+        ---------------------------------------
+        srcfilepath: [{srcfilepath}]
+        trgfilepath: [{trgfilepath}]
+        ---------------------------------------
+        Going for downloading the audio-complement.
+      """
+      print(scrmsg)
+    except (IOError, OSError) as e:
+      errmsg = f"""Error when attempting to rename:
+      ---------------------------------------
+      FROM (bksufix):  [{srcfilename}]
+      TO    (fsufix):  [{trgfilename}]
+      ---------------------------------------
+      => {e}
+      Halting.
+      """
+      print(errmsg)
+      sys.exit(1)
 
   def fallback_to_nondashed_audiocode_changing_it(self):
     """
@@ -889,11 +931,11 @@ class Downloader:
         so if the videoonly_canonical_filename is present,
         this is an error to be caught (exception to be raised)
     """
-    self.rename_bksufixedfile_backtovideoonlyfilename_sothatitcancomposite()  # it's done by removing number sufix
+    self.rename_bksufixedfilename_to_fsufixedfilename_to_avoid_the_vo_redownload()  # it's done by removing number sufix
     # now, after the previous rename, the above caution in the docstr can be checked
-    canofilepath = self.osentry.fp_for_fn_as_name_ext
-    if os.path.isfile(canofilepath):
-      self.osentry.rename_canofile_to_next_available_lang_n_prefixed_or_raise()
+    # canofilepath = self.osentry.fp_for_fn_as_name_ext
+    # if os.path.isfile(canofilepath):
+    #   self.osentry.rename_canofile_to_next_available_lang_n_prefixed_or_raise()
     audiocode = self.audioonlycodes[self.n_ongoing_lang - 1]
     compositecode = f"{self.videoonlycode}+{audiocode}"
     pdict = {'compositecode': compositecode, 'videourl': self.videourl}
@@ -928,26 +970,56 @@ class Downloader:
       video_canonical_filename is wrongly taking the fsufix (ex f160)
       after the first fusion (i.e., the download of the first audio and formation of the 1st lang video)
     """
+    srccanofilepath = self.osentry.fp_for_fn_as_name_ext
+    srccanofilename = self.osentry.fp_for_fn_as_name_ext
     audioonlycode = self.audioonlycodes[self.n_ongoing_lang-1]
     langprefix = f"lang{self.n_ongoing_lang}_{audioonlycode}"
-    langprefixfilename = f"{langprefix} {self.osentry.fn_as_name_ext}"
-    trg_filepath = os.path.join(self.child_tmpdir_abspath, langprefixfilename)
+    langprefixedfilename = f"{langprefix} {self.osentry.fn_as_name_ext}"
+    langprefixedfilepath = os.path.join(self.osentry.workdir_abspath, langprefixedfilename)
     scrmsg = f"""lang={self.n_ongoing_lang} | audiocode={audioonlycode} | renaming:
-    FROM: {self.osentry.fn_as_name_ext}
-    TO:   {langprefixfilename}
+    ------------------------------------
+    FROM (canonical)  : [{srccanofilename}]
+    TO (lang-prefixed): [{langprefixedfilename}]
+    ------------------------------------
     """
     print(scrmsg)
-    canofilepath = self.osentry.fp_for_fn_as_name_ext
-    if not os.path.isfile(canofilepath):
-      canofilepath = self.find_existfilepath_of_samecanonicalfilename_w_different_ext_or_none()
-      if canofilepath is None:
+    if not os.path.isfile(srccanofilepath):
+      srccanofilepath = self.find_existfilepath_of_samecanonicalfilename_w_different_ext_or_none()
+      if srccanofilepath is None:
         # can't rename
         wrnmsg = f"""Cannot rename canonical filename:
-          FROM: "{canofilepath}"
-          (TO:   "{langprefixfilename}")
-        It's not present in folder."""
+          ------------------------------------
+          FROM (canonical)  : [{srccanofilepath}]
+          TO (lang-prefixed): [{langprefixedfilename}"]
+          ------------------------------------
+          => reason: canonical (FROM) is not present in folder. Continuing."""
         print(wrnmsg)
-    os.rename(canofilepath, trg_filepath)
+        return
+      # update srccanofilename from srccanofilepath
+      _, srccanofilename = os.path.split(srccanofilepath)
+    if os.path.isfile(langprefixedfilepath):
+      # if targetfile is present, rename will raise an exception, return from here
+      wrnmsg = f"""Cannot rename to lang-prefixed filename:
+        ------------------------------------
+        FROM (canonical)  : [{srccanofilepath}]
+        TO (lang-prefixed): [{langprefixedfilename}"]
+        ------------------------------------
+        => reason: lang-prefixed filename (TO) is already present in folder. Continuing."""
+      print(wrnmsg)
+      return
+    try:
+      os.rename(srccanofilepath, langprefixedfilepath)
+    except (IOError, OSError) as e:
+      errmsg = f"""Error when attempting to rename:
+      ---------------------------------------
+      FROM (canonical)  : [{srccanofilepath}]
+      TO (lang-prefixed): [{langprefixedfilename}"]
+      ---------------------------------------
+      => {e}
+      Halting.
+      """
+      print(errmsg)
+      sys.exit(1)
 
   def download_audio_complements(self):
     """
@@ -960,7 +1032,7 @@ class Downloader:
   def process(self):
     """
       1st -> position (cd changedir) at the working tmpdir
-      2nd -> download the 160 video
+      2nd -> download the 160 (or the entered as input) video
       3rd -> disconver the downloaded video's filename
       4th -> copy it to as many as there audio lang entered
         (for example: if one language is Italian, another is for English, two copies are made)
@@ -969,16 +1041,17 @@ class Downloader:
         5-2 "fuse" it with the videofile in store so that the composite results
     """
     scrmsg = f"""1st step ->
-    POSITION (chdir) at the working tmpdir: [{self.child_tmpdir_abspath}]"""
+    POSITION (chdir) at the working tmpdir: [{self.osentry.workdir_abspath}]"""
     print(scrmsg)
-    os.chdir(self.child_tmpdir_abspath)
+    os.chdir(self.osentry.workdir_abspath)
     scrmsg = f"""2nd step ->
-    DOWNLOAD the 160 video (ytid={self.ytid})"""
+    DOWNLOAD the {self.videoonlycode} video (ytid={self.ytid})"""
     print(scrmsg)
     self.download_video_only()
     scrmsg = f"""3rd step -> 
-    DISCOVER the downloaded video's filename (with ytid={self.ytid}) and rename it to the videoonlyfile
-             that one will serve the audio files to later compose audio+video"""
+    DISCOVER the downloaded video's filename (with ytid={self.ytid})
+      and rename it to the videoonlyfile
+      that one will serve the audio files to later compose audio+video"""
     print(scrmsg)
     self.discover_dldd_videofilename()
     self.rename_from_canonical_to_fsufixedvideoonlyfile()
