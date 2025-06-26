@@ -342,6 +342,41 @@ class OSEntry:
   def get_fp_for_fn_as_name_fsufix_ext_bksufix(self, n_bksufix) -> os.path:
     return os.path.join(self.folderpath, self.get_fn_as_name_fsufix_ext_bksufix(n_bksufix))
 
+  def rename_canofile_to_next_available_lang_n_prefixed_or_raise(self):
+    """
+    This method renames existing canofile to the next available langN prefix
+    if prefix gets greater than 1000, raise an exception
+    """
+    canofile = self.fp_for_fn_as_name_ext
+    if not os.path.isfile(canofile):
+      # nothing to do, return
+      return
+    changing_filepath = canofile
+    n_iter, max_iter = 0, 1000
+    while os.path.isfile(changing_filepath):
+      n_iter += 1
+      if n_iter > max_iter:
+        errmsg = f"Maximum iteration cycles reaches when trying to rename {canofile} {changing_filepath}"
+        raise OSError(errmsg)
+      prefix = f"lang{n_iter} "
+      _, changing_filename = os.path.split(changing_filepath)
+      if changing_filename.startswith(prefix):
+        pp = changing_filename.split(' ')
+        changing_filename = ' '.join(pp[1])
+      else:
+        changing_filename = prefix + changing_filename
+      changing_filepath = os.path.join(self.folderpath, changing_filename)
+    try:
+      os.rename(canofile, changing_filepath)
+    except (OSEntry, IOError) as e:
+      errmsg = f"""Error: could not rename canofile to next available prefix
+      {e}
+      Halting.    
+      """
+      print(errmsg)
+      sys.exit(1)
+    return
+
   def __str__(self):
     bksufix_example = 3
     outstr = f"""OSEntry object:
@@ -420,6 +455,46 @@ class Downloader:
     url = self.video_baseurl.format(**pdict)
     return url
 
+  def rename_canofile_to_the_bk1sufixed(self):
+    """
+    The canonical filename (the one downloaded) gets renamed to the bk1sufixed filename
+      for the first language available
+    :return:
+    """
+    srcfilepath = self.osentry.fp_for_fn_as_name_fsufix_ext
+    srcfilename = self.osentry.fn_as_name_fsufix_ext
+    audiocode = self.audioonlycodes[0]  # index 0 is the first language
+    trgfilepath = self.osentry.get_fp_for_fn_as_name_fsufix_ext_bksufix(1)
+    trgfilename = self.osentry.get_fn_as_name_fsufix_ext_bksufix(1)
+    if not os.path.isfile(srcfilepath):
+      scrmsg = f"""Cannot rename | lang=1 audiocode={audiocode}
+        FROM canofilename = [{srcfilename}]
+        TO bk1sufixfilename = [{trgfilename}]
+          => reason: because {srcfilename} does not exist in folder. Halting.
+      """
+      print(scrmsg)
+      sys.exit(1)
+    if os.path.isfile(trgfilepath):
+      scrmsg = f"""Already renamed | lang=1 audiocode={audiocode}
+        -------------------- 
+        FROM (canofilename)  : [{srcfilename}]
+        TO (bk1sufixfilename): [{trgfilename}]
+        -------------------- 
+          => reason: because {trgfilename} exists in folder. Continuing.
+      """
+      return
+    try:
+      os.rename(srcfilepath, trgfilepath)
+      print("Renamed accomplished")
+    except (IOError, OSError) as e:
+      errmsg = f"""Error when attempting to rename bksufix lang=1 audiocode={audiocode} 
+      => {e}
+
+      Halting.
+      """
+      print(errmsg)
+      sys.exit(1)
+
   def copy_n_rename_videoonly_n_lang_times(self):
     """
     The first video is just renamed to sufix "bk<seq>" where seq is the audio sequential number
@@ -427,46 +502,50 @@ class Downloader:
     Obs: The first video is renamed at the end, i.e., the copies are done firstly
     """
     if self.n_langs == 0:
+      #  nothing to rename, return
       return
-    if self.n_langs > 1:
-      for i in range(1, self.n_langs):
-        lang_seq = i + 1
-        audiocode = self.audioonlycodes[lang_seq-1]
-        trg_filepath = self.osentry.get_fp_for_fn_as_name_fsufix_ext_bksufix(lang_seq)
-        if os.path.isfile(trg_filepath):
-          scrmsg = f"""lang={lang_seq} audiocode={audiocode}
-           name_vofsufix_ext =  {self.osentry.fn_as_name_fsufix_ext}
-           HAS ALREADY BEEN COPIED (for complementing later on) to {trg_filepath}"""
-          print(scrmsg)
-          continue
-        shutil.copy2(self.osentry.fp_for_fn_as_name_fsufix_ext, trg_filepath)
-        scrmsg = f"""lang={lang_seq} audiocode={audiocode}
-         name_vofsufix_ext =  {self.osentry.fn_as_name_fsufix_ext}
-         COPIED (for later a+v blending) to {trg_filepath}"""
-        print(scrmsg)
-    # rename "bk1" at last
-    lang_seq = 1
-    audiocode = self.audioonlycodes[lang_seq - 1]
-    trg_filepath = self.osentry.get_fp_for_fn_as_name_fsufix_ext_bksufix(lang_seq)
-    if os.path.isfile(trg_filepath):
-      scrmsg = f"""lang={lang_seq} audiocode={audiocode}
-       name_vofsufix_ext =  {self.osentry.fn_as_name_fsufix_ext}
-       HAS ALREADY BEEN RENAMED (for complementing later on) to {trg_filepath}"""
-      print(scrmsg)
+    # the path below represents the video filename as downloaded
+    # the first one is a rename
+    self.rename_canofile_to_the_bk1sufixed()
+    if self.n_langs == 1:
+      # done, return
       return
-    try:
-      os.rename(self.osentry.fn_as_name_fsufix_ext, trg_filepath)
-      scrmsg = f"""lang={lang_seq} audiocode={audiocode}
-       fsufixed_videoonlyfilename =  {self.osentry.fn_as_name_fsufix_ext}
-       RENAMED (for complementing later on) to {trg_filepath}"""
-      print(scrmsg)
-    except (IOError, OSError) as e:
-      errmsg = f"""Error when attempting to rename
-      bksufix lang={lang_seq} audiocode={audiocode} 
-      to the fsufixed_videoonlyfilename as: [{self.osentry.fn_as_name_fsufix_ext}]
-      => {e}
+    # at this point, bk1 exists due to the previous rename (the method called above in this)
+    srcfilepath = self.osentry.get_fp_for_fn_as_name_fsufix_ext_bksufix(1)
+    srcfilename = self.osentry.get_fn_as_name_fsufix_ext_bksufix(1)
+    if not os.path.isfile(srcfilepath):
+      errmsg = f"Error: srcfilename [{srcfilename}] for copying bk's does not exist."
+      print(errmsg)
+      sys.exit(1)
+    for i in range(1, self.n_langs):
+      lang_seq = i + 1
+      audiocode = self.audioonlycodes[i]
+      trgfilepath = self.osentry.get_fp_for_fn_as_name_fsufix_ext_bksufix(lang_seq)
+      trgfilename = self.osentry.get_fn_as_name_fsufix_ext_bksufix(lang_seq)
+      scrmsg = f"""[copying bk1 to the bk{lang_seq} audiocode={audiocode}]
+        -------------------- 
+        FROM:  {srcfilename}
+        TO:    {trgfilename}
+        -------------------- 
       """
-      raise OSError(errmsg)
+      print(scrmsg)
+      if os.path.isfile(trgfilepath):
+        scrmsg = f"Continuing: trgfilename [{trgfilename}] already exists."
+        print(scrmsg)
+        continue
+      try:
+        shutil.copy2(srcfilepath, trgfilepath)
+      except (IOError, OSError) as e:
+        errmsg = f"""Error: the copying above failed
+          -------------------- 
+          FROM:  {srcfilename}
+          TO:    {trgfilename}
+          -------------------- 
+        {e}
+        Halting.
+        """
+        print(errmsg)
+        sys.exit(1)
 
   def store_files_that_already_exist_into_a_list(self, tmpdir_abspath):
     """
@@ -739,9 +818,11 @@ class Downloader:
     srcfilename = self.osentry.get_fn_as_name_fsufix_ext_bksufix(self.n_ongoing_lang)
     trgfilepath = self.osentry.fp_for_fn_as_name_fsufix_ext
     trgfilename = self.osentry.fn_as_name_fsufix_ext
-    scrmsg = f"""Rename:
-    srcfilename = {srcfilename}
-    trgfilename = {trgfilename}
+    scrmsg = f"""Rename (bksufix back to fsufix for next download):
+      ---------------------------------------
+      srcfilename = {srcfilename}
+      trgfilename = {trgfilename}
+      ---------------------------------------
     """
     print(scrmsg)
     if os.path.isfile(srcfilepath) and not os.path.isfile(trgfilepath):
@@ -754,21 +835,15 @@ class Downloader:
         os.rename(srcfilepath, trgfilepath)
       except (IOError, OSError) as e:
         errmsg = f"""Error when attempting to rename:
+        ---------------------------------------
         FROM: [{name_fsufix_ext_bksufix}]
         TO:   [{self.osentry.fn_as_name_fsufix_ext}]
         ---------------------------------------
         => {e}
+        Halting.
         """
-        raise OSError(errmsg)
-    canofilepath = self.osentry.fp_for_fn_as_name_ext
-    canofilename = self.osentry.fn_as_name_ext
-    if os.path.isfile(canofilepath):
-      scrmsg = f"""[canonical file is present, going to delete it for the next download.
-      Deleting canonical file so that yt-dlp can download the audio and blend it.
-      {canofilename}
-      {canofilepath}"""
-      print(scrmsg)
-      os.remove(canofilepath)
+        print(errmsg)
+        sys.exit(1)
 
   def fallback_to_nondashed_audiocode_changing_it(self):
     """
@@ -816,24 +891,9 @@ class Downloader:
     """
     self.rename_bksufixedfile_backtovideoonlyfilename_sothatitcancomposite()  # it's done by removing number sufix
     # now, after the previous rename, the above caution in the docstr can be checked
-    if os.path.isfile(self.osentry.fp_for_fn_as_name_ext):
-      # oh, oh error
-      errmsg = f"""Error:
-      the canonical_videoonly_filename [{self.osentry.fn_as_name_ext}] should not be present in dir,
-      otherwise yt-dlp will deduce that the audio+video composite has already happened which it doesn't yet.
-      
-      The user should check whether this file is the final one or
-        in case it's not, something might be incorrect with this script
-        (or network or yt-dlp's underlying version).
-      
-      Notice also that the canonical filename will be, at the end,
-        prepended with "lang<n>" (lang1, lang2, etc.)
-      The user may rename it to a different pattern because this script is,
-        at moment of writing, agnostic of the audiocode-to-language mapping.
-        (Ignore this last paragraph if this system can already find out 
-          about the audiocode-to-language mapping.) 
-      """
-      raise OSError(errmsg)
+    canofilepath = self.osentry.fp_for_fn_as_name_ext
+    if os.path.isfile(canofilepath):
+      self.osentry.rename_canofile_to_next_available_lang_n_prefixed_or_raise()
     audiocode = self.audioonlycodes[self.n_ongoing_lang - 1]
     compositecode = f"{self.videoonlycode}+{audiocode}"
     pdict = {'compositecode': compositecode, 'videourl': self.videourl}
