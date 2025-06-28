@@ -6,6 +6,48 @@ This script uses yt-dlp to download (YouTube) a video in two or more languages i
   (translations in general are autodubbed)
   (each language forms a separate videofile)
 
+Usage:
+======
+  $dlYouTubeWhenThereAreDubbed.py [--ytid <ytid or yturl within "">]
+    [--useinputfile]
+    [--videoonlycode <video-format-number>]
+    --audioonlycodes <list of audio-format-codes>
+
+Where:
+  <ytid> => the ENCODE64 11-character YouTube video id
+    or a youtube-style URL with one but in the latter case
+      it should come within "" (quotes) if it has an "&" (ampersand character)
+      obs: the use of parameter --useinputfile looks for ytid's
+           in a file named youtube-ids.txt in the working directory and ignores --ytid
+  <video-format-number> => an integer representing the video-only-format
+    default: this parameter defaults to 160 (a video-only-code having 256x144 resolution)
+  <list of audio-format-codes> => a list of all audio-only-codes desired for the yt-dlp downloads
+
+Example:
+========
+  $dlYouTubeWhenThereAreDubbed.py --ytid abcABC123-_
+    --audioonlycodes 233-0,233-1
+
+The above example 'automatizes' the following two yt-dlp downloads:
+  $yt-dlp -w -f 160+233-0 abcABC123-_
+  $yt-dlp -w -f 160+233-1 abcABC123-_
+
+The result will be the download of two videofiles: one with the language audio 233-0
+  and the other with the language audio 233-1 (be they original or autodubbed)
+This automatization also takes care of the renaming needed
+  because yt-dlp does not differentiate filenames by language audio
+
+Care with the use of parameter --useinputfile:
+=============================================
+  if the user wants to download many videos at once, it can be done with --useinputfile,
+    suffice a youtube-ids.txt is created with all the ytid's consolidated
+  however, this script (and this is reinforced below) does not know beforehand if a video
+   has or doesn't have a specific language for it.
+
+
+Explanation
+===========
+
 This script accepts the following input:
   1  it receives as input a youtube-video-id (ytid)
   2  alternatively, instead of a ytid, it may receive as input ytids in a text file (whose name is youtube-ids.txt)
@@ -99,6 +141,7 @@ Limitation: what does this script not do (at least yet)?
 """
 import argparse
 import os.path
+import re
 import shutil
 import string
 import subprocess
@@ -110,6 +153,9 @@ DEFAULT_YTIDS_FILENAME = 'youtube-ids.txt'
 REGISTERED_VIDEO_DOT_EXTENSIONS = ['.mp4', '.mkv', '.webm', '.m4v', '.avi', '.wmv']
 YTID_CHARSIZE = 11
 enc64_valid_chars = string.digits + string.ascii_lowercase + string.ascii_uppercase + '_-'
+# Example for the re below: https://www.youtube.com/watch?v=abcABC123_-&pp=continuation
+ytid_url_regexp_pattern = r'watch\?v=([A-Za-z0-9_-]{11})(?=(&|$))'
+cmpld_ytid_url_re_pattern = re.compile(ytid_url_regexp_pattern)
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Compress videos to a specified resolution.")
 parser.add_argument("--ytid", type=str,
@@ -136,6 +182,31 @@ def is_str_a_ytid(ytid: str | None) -> bool:
   if ytid is None or len(ytid) != YTID_CHARSIZE:
     return False
   return is_str_enc64(ytid)
+
+
+def extract_ytid_from_yturl_or_itself_or_none(p_supposed_ytid: str | None) -> str | None:
+  """
+  Extracts ytid from a larger string (incluing a URL)
+  Noting:
+    if ytid is None, return None
+    if ytid is already "in shape", return it as is
+    if ytid is a larger string, try to extract a valid "ytid" from it
+    if extraction fails, return None
+
+  Example of an extraction from a yt_url:
+    url = "https://www.youtube.com/watch?v=abcABC123_-&pp=continuation"
+  The extraction result is:
+    ytid = "abcABC123_-"
+
+    Obs: "abcABC123_-" in the example is hypothetical (an ENC64 11-char string)!
+  """
+  if p_supposed_ytid is None:
+    return None
+  if is_str_a_ytid(p_supposed_ytid):
+    ytid = p_supposed_ytid
+    return ytid
+  match = cmpld_ytid_url_re_pattern.search(p_supposed_ytid)
+  return match.group(1) if match else None
 
 
 def read_ytids_from_default_file_n_get_as_list(p_dlddir_abspath, ytids_filename=None):
@@ -363,7 +434,10 @@ class OSEntry:
     while os.path.isfile(changing_filepath):
       n_iter += 1
       if n_iter > max_iter:
-        errmsg = f"Maximum iteration cycles reaches when trying to rename {canofile} {changing_filepath}"
+        canofilename = self.fn_as_name_ext
+        _, changing_filename = os.path.split(changing_filepath)
+        errmsg = (f"Maximum iteration cycles reaches when trying to rename {canofilename}"
+                  f" | {changing_filename} | {changing_filepath}")
         raise OSError(errmsg)
       _, changing_filename = os.path.split(canofilepath)
       prefix = f"lang{n_iter} "
@@ -471,7 +545,7 @@ class Downloader:
 
   def rename_canofile_to_the_bk1sufixed(self):
     """
-    The canonical filename (the one downloaded) gets renamed to the bk1sufixed filename
+    The canonical filename (the one downloaded) gets renamed to the bk1_sufixed filename
       for the first language available
     :return:
     """
@@ -496,6 +570,7 @@ class Downloader:
         -------------------- 
           => reason: because {trgfilename} exists in folder. Continuing.
       """
+      print(scrmsg)
       return
     try:
       os.rename(srcfilepath, trgfilepath)
@@ -712,12 +787,16 @@ class Downloader:
            and this bksufix is not used in this method
     """
     if os.path.isfile(self.osentry.fp_for_fn_as_name_fsufix_ext):
-      srcmsg = f"""Not renaming to fsufixed_videoonlyfilename [{self.osentry.fn_as_name_fsufix_ext}]
+      scrmsg = f"""Not renaming to fsufixed_videoonlyfilename [{self.osentry.fn_as_name_fsufix_ext}]
        as it already exists. Continuing."""
-      print(srcmsg)
+      print(scrmsg)
       return False
     try:
       os.rename(self.osentry.fp_for_fn_as_name_ext, self.osentry.fp_for_fn_as_name_fsufix_ext)
+      scrmsg = f"""Rename succeeded (from canonical to f-sufixed).
+      FROM (canonical): [{self.osentry.fn_as_name_ext}]
+      FROM (f-sufixed): [{self.osentry.fn_as_name_fsufix_ext}]"""
+      print(scrmsg)
       return True
     except (IOError, OSError) as e:
       errmsg = f"""Error when attempting to rename
@@ -744,9 +823,11 @@ class Downloader:
     scrmsg = f"@download_video_only | {comm}"
     print(scrmsg)
     try:
+      """
       ans = input('Run this command above (Y/n) ? [ENTER] means Yes')
       if ans not in ['Y', 'y', '']:
         return False
+      """
       subprocess.run(comm, shell=True, check=True)  # timeout=5 (how long can a download last?)
     # except subprocess.TimeoutExpired:
     #     print(f"Command timed out: {comm}")
@@ -829,13 +910,6 @@ class Downloader:
     srcfilename = self.osentry.get_fn_as_name_fsufix_ext_bksufix(self.n_ongoing_lang)
     trgfilepath = self.osentry.fp_for_fn_as_name_fsufix_ext
     trgfilename = self.osentry.fn_as_name_fsufix_ext
-    scrmsg = f"""bksufix = .bk{self.n_ongoing_lang} | renaming it to fsufix {self.osentry.fsufix}:
-    ----------------------------------
-    FROM (bksufix):  [{srcfilename}]
-    TO    (fsufix):  [{trgfilename}]
-    ----------------------------------
-    """
-    print(scrmsg)
     # check existence
     if not os.path.isfile(srcfilepath):
       errmsg = f"""For the rename above
@@ -859,19 +933,13 @@ class Downloader:
         print(errmsg)
         os.remove(srcfilepath)
       return
-    # if not os.path.isfile(trgfilepath):
-    # with these 2 conditions, rename can happen
-    # errmsg = f"""Error:
-    # trgfile [{self.osentry.fn_as_name_fsufix_ext}]
-    #   for backrename is not present in the folder. it may have been moved or renamed."""
-    # raise OSError(errmsg)
     try:
       os.rename(srcfilepath, trgfilepath)
-      scrmsg = f"""Rename succeeded:
-        ---------------------------------------
-        srcfilepath: [{srcfilepath}]
-        trgfilepath: [{trgfilepath}]
-        ---------------------------------------
+      scrmsg = f"""Rename succeeded: from bksufix=".bk{self.n_ongoing_lang}" to fsufix="{self.osentry.fsufix}":
+      ----------------------------------
+      FROM (bksufix):  [{srcfilename}]
+      TO    (fsufix):  [{trgfilename}]
+      ----------------------------------
         Going for downloading the audio-complement.
       """
       print(scrmsg)
@@ -928,14 +996,11 @@ class Downloader:
     One caution here:
       the videoonly_canonical_filename (the one without sufixes) should not be present,
         otherwise yt-dlp will deduce that the composition has already happened,
-        so if the videoonly_canonical_filename is present,
-        this is an error to be caught (exception to be raised)
+        (and inform the video has already been download (when only the videopart has)
+        so if the videoonly_canonical_filename is present
+        (the first 'rename' method below sees to it)
     """
     self.rename_bksufixedfilename_to_fsufixedfilename_to_avoid_the_vo_redownload()  # it's done by removing number sufix
-    # now, after the previous rename, the above caution in the docstr can be checked
-    # canofilepath = self.osentry.fp_for_fn_as_name_ext
-    # if os.path.isfile(canofilepath):
-    #   self.osentry.rename_canofile_to_next_available_lang_n_prefixed_or_raise()
     audiocode = self.audioonlycodes[self.n_ongoing_lang - 1]
     compositecode = f"{self.videoonlycode}+{audiocode}"
     pdict = {'compositecode': compositecode, 'videourl': self.videourl}
@@ -943,10 +1008,12 @@ class Downloader:
     try:
       scrmsg = f"audiocode={audiocode} | running: {comm}"
       print(scrmsg)
+      """
       scrmsg = f"Continue with the download above (Y/n)? [ENTER] means Yes"
       ans = input(scrmsg)
       if ans not in ['Y', 'y', '']:
         sys.exit(0)
+      """
       subprocess.run(comm, shell=True, check=True)  # timeout=5 (how long can a download last?)
     # except subprocess.TimeoutExpired:
     #     print(f"Command timed out: {comm}")
@@ -966,9 +1033,10 @@ class Downloader:
 
   def rename_videofile_after_audiovideofusion(self):
     """
-    To troubleshoot:
-      video_canonical_filename is wrongly taking the fsufix (ex f160)
-      after the first fusion (i.e., the download of the first audio and formation of the 1st lang video)
+    Because two or more files may be downloaded and cannot have the same name,
+      (yt-dlp forms the same filename regardless of language)
+      this method prefix-renames the file just downloaded so that the next
+      download is "available" for yt-dlp (as its filename is available)
     """
     srccanofilepath = self.osentry.fp_for_fn_as_name_ext
     srccanofilename = self.osentry.fp_for_fn_as_name_ext
@@ -976,13 +1044,6 @@ class Downloader:
     langprefix = f"lang{self.n_ongoing_lang}_{audioonlycode}"
     langprefixedfilename = f"{langprefix} {self.osentry.fn_as_name_ext}"
     langprefixedfilepath = os.path.join(self.osentry.workdir_abspath, langprefixedfilename)
-    scrmsg = f"""lang={self.n_ongoing_lang} | audiocode={audioonlycode} | renaming:
-    ------------------------------------
-    FROM (canonical)  : [{srccanofilename}]
-    TO (lang-prefixed): [{langprefixedfilename}]
-    ------------------------------------
-    """
-    print(scrmsg)
     if not os.path.isfile(srccanofilepath):
       srccanofilepath = self.find_existfilepath_of_samecanonicalfilename_w_different_ext_or_none()
       if srccanofilepath is None:
@@ -1009,6 +1070,13 @@ class Downloader:
       return
     try:
       os.rename(srccanofilepath, langprefixedfilepath)
+      scrmsg = f"""Rename succeeded => lang={self.n_ongoing_lang} | audiocode={audioonlycode}
+      ------------------------------------
+      FROM (canonical)  : [{srccanofilename}]
+      TO (lang-prefixed): [{langprefixedfilename}]
+      ------------------------------------
+      """
+      print(scrmsg)
     except (IOError, OSError) as e:
       errmsg = f"""Error when attempting to rename:
       ---------------------------------------
@@ -1066,21 +1134,6 @@ class Downloader:
     # move all videos from child_tmpdir_abspath to its parent dir
 
 
-def adhoc_test2():
-  dirpath = args.dirpath or os.path.abspath('.')
-  # inputfilepath = os.path.join(dirpath, DEFAULT_YTIDS_FILENAME)
-  ytids = read_ytids_from_default_file_n_get_as_list(dirpath)
-  scrmsg = f"adhoc_test2 :: ytids = {ytids}"
-  print(scrmsg)
-
-
-def adhoc_test1():
-  ytid = 'abc+10'
-  scrmsg = f'Testing verify_ytid_validity_or_raise({ytid})'
-  print(scrmsg)
-  verify_ytid_validity_or_raise(ytid)
-
-
 def get_cli_args():
   """
   Required parameters:
@@ -1108,6 +1161,7 @@ def get_cli_args():
 
 def confirm_cli_args_with_user():
   ytid, b_useinputfile, dirpath, videoonlycode, audioonlycodes = get_cli_args()
+  ytid = extract_ytid_from_yturl_or_itself_or_none(ytid)
   print(ytid, 'b_useinputfile', b_useinputfile, dirpath, videoonlycode, audioonlycodes)
   if not os.path.isdir(dirpath):
     scrmsg = "Source directory [{src_rootdir_abspath}] does not exist. Please, retry."
@@ -1169,15 +1223,39 @@ def process():
     downloader.process()
 
 
+def adhoc_test3():
+  t = 'https://www.youtube.com/watch?v=Gjg471uIL9k&pp=wgIGCgQQAhgD'
+  ytid = extract_ytid_from_yturl_or_itself_or_none(t)
+  scrmsg = f"""Testing {t}
+  Resulting {ytid}"""
+  print(scrmsg)
+  t = 'https://www.youtube.com/watch?v=abcABC123_-&pp=continuation'
+  ytid = extract_ytid_from_yturl_or_itself_or_none(t)
+  scrmsg = f"""Testing {t}
+  Resulting {ytid}"""
+  print(scrmsg)
+  # return ytid
+
+
+def adhoc_test2():
+  dirpath = args.dirpath or os.path.abspath('.')
+  # inputfilepath = os.path.join(dirpath, DEFAULT_YTIDS_FILENAME)
+  ytids = read_ytids_from_default_file_n_get_as_list(dirpath)
+  scrmsg = f"adhoc_test2 :: ytids = {ytids}"
+  print(scrmsg)
+
+
+def adhoc_test1():
+  ytid = 'abc+10'
+  scrmsg = f'Testing verify_ytid_validity_or_raise({ytid})'
+  print(scrmsg)
+  verify_ytid_validity_or_raise(ytid)
+
+
 if __name__ == '__main__':
   """
-  Example for test (could be any one that has some dubbing options)
-  https://www.youtube.com/watch?v=xtaOUGft57o
-  ytid = xtaOUGft57o
-    dlYouTubeWhenThereAreDubbed.py --ytid xtaOUGft57o   
-    dlYouTubeWhenThereAreDubbed.py ----useinputfile   
-
   adhoc_test1()
   adhoc_test2()
+  adhoc_test3()
   """
   process()
