@@ -105,17 +105,18 @@ An example of language audiocodes, having English as the original:
 An example of language audiocodes, having Portuguese as the original:
     (seen in another channel we visited):
     (again it only shows the dash-numbers for the audioonlycode 233)
-  233-0  mp4 audio only    m3u8 [en-US] American English - original (default)
-  233-1  mp4 audio only    m3u8 [pt-BR] Português (Brasil) - dubbed-auto
+  233-0  mp4 audio only    m3u8 [en-US] American English - dubbed-auto
+  233-1  mp4 audio only    m3u8 [pt-BR] Português (Brasil) - original (default)
 
 This second case (where English is autodubbed) seems more stable in terms of standardized audiocodes.
-The first case (where English is the original) seems to differ a little among channels
-  but enough to "miss the point", at some moment, if applied generally.
+The first case (where English is the original) seems to differ "a little" among channels,
+  though "a little", it's enough to "miss the point", at some moment, if applied generally.
 The user has to use the audiocodes CLI parameter to tell the correct audiocodes (*).
   The default today uses [233-0, 233-1]
     roughly stable for when English is autodubbed and another language is the original
 
  (*) to see the full list of CLI parameters for this script, run it with --help
+     (or scroll up the text to the beginning)
 
 A programatic discovery of these audioonlycodes (mapping language to format code)
   via yt-dlp might be done in the future,
@@ -153,9 +154,11 @@ DEFAULT_YTIDS_FILENAME = 'youtube-ids.txt'
 REGISTERED_VIDEO_DOT_EXTENSIONS = ['.mp4', '.mkv', '.webm', '.m4v', '.avi', '.wmv']
 YTID_CHARSIZE = 11
 enc64_valid_chars = string.digits + string.ascii_lowercase + string.ascii_uppercase + '_-'
-# Example for the re below: https://www.youtube.com/watch?v=abcABC123_-&pp=continuation
+# Example for the regexp below: https://www.youtube.com/watch?v=abcABC123_-&pp=continuation
 ytid_url_regexp_pattern = r'watch\?v=([A-Za-z0-9_-]{11})(?=(&|$))'
 cmpld_ytid_url_re_pattern = re.compile(ytid_url_regexp_pattern)
+ytid_in_ytdlp_filename_pattern = r'\[([A-Za-z0-9_-]{11})\]'
+cmpld_ytid_in_ytdlp_filename_pattern = re.compile(ytid_in_ytdlp_filename_pattern)
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Compress videos to a specified resolution.")
 parser.add_argument("--ytid", type=str,
@@ -247,7 +250,6 @@ class OSEntry:
   """
 
   def __init__(self, workdir_abspath, basefilename, videoonly_or_audio_code):
-    self.workdir_abspath = workdir_abspath
     self.name, self.dot_ext = None, None
     self._basefilename = None
     self.basefilename = basefilename
@@ -255,14 +257,31 @@ class OSEntry:
       self.videoonly_or_audio_code = DEFAULT_AUDIOVIDEO_CODE
     else:
       self.videoonly_or_audio_code = videoonly_or_audio_code
+    self.workdir_abspath = workdir_abspath
+    self.treat_workdir_abspath()
+
+  def treat_workdir_abspath(self):
+    if self.workdir_abspath is None or self.workdir_abspath == '.':
+      self.workdir_abspath = os.path.abspath('.')
+      return
+    if not os.path.isdir(self.workdir_abspath):
+      # this directory is set at client Class Downloader and passed on here
+      # but at this instantiation time chances are it may still need to be made (mkdir)
+      os.makedirs(self.workdir_abspath, exist_ok=True)
+      return
+    if not os.path.isdir(self.workdir_abspath):
+      # this is a logical condition that it will probably never happen
+      # for an exception should have probably been already raised above
+      errmsg = f"Error: workdir_abspath {self.workdir_abspath} does not exist. Please, retry reentering it."
+      raise OSError(errmsg)
 
   @property
   def basefilename(self):
     """
-    basefilename is video filename as it comes from the yt-dlp
-    in this class:
-      1 - it's the same as fn_as_name_ext
-      2 - and also decomposable as "{name}{dot_ext}"
+    basefilename is video filename as it comes from yt-dlp
+      In this class:
+        1 - it's the same as fn_as_name_ext
+        2 - and also decomposable as "{name}{dot_ext}"
     it could be further decomposed because of the video-id sufixing the name,
       but that goes for a different method below (TODO)
     :return:
@@ -292,7 +311,11 @@ class OSEntry:
       c) because this script looks up the downloaded file from yt-dlp,
          the correct convention is the one in 'a' above
       (*) the convention is to have the 11-char ytid enclosed within "[]" at the end of name
-    :return:
+
+    ------------------
+    # [ALTERNATIVELY] code to try find ytid (the ENC64 11-character id) via RegExp
+    match = cmpld_ytid_in_ytdlp_filename_pattern.search(self.name)
+    self.ytid = match.group(1) if match else None
     """
     try:
       sufix = self.name[-13:]
@@ -468,15 +491,17 @@ class OSEntry:
   def __str__(self):
     bksufix_example = 3
     outstr = f"""OSEntry object:
-    name_ext = {self.fn_as_name_ext}
-    fp_name_ext = {self.fp_for_fn_as_name_ext}
+    name_ext = [{self.fn_as_name_ext}]
+    fp_name_ext = [{self.fp_for_fn_as_name_ext}]
+    ytid = [{self.ytid}]
+    workdir = [{self.workdir_abspath}]
     --------------------------------
-    name_fsufix_ext = {self.fn_as_name_fsufix_ext}
-    fp_name_fsufix_ext = {self.fp_for_fn_as_name_fsufix_ext}
+    name_fsufix_ext = [{self.fn_as_name_fsufix_ext}]
+    fp_name_fsufix_ext = [{self.fp_for_fn_as_name_fsufix_ext}]
     --------------------------------
-    Example with bksufix = {bksufix_example}
+    Example with bksufix = [{bksufix_example}]
     name_fsufix_ext_bksufix[{bksufix_example}] = {self.get_fn_as_name_fsufix_ext_bksufix(bksufix_example)}
-    fp_name_fsufix_ext = {self.get_fp_for_fn_as_name_fsufix_ext_bksufix(bksufix_example)}
+    fp_name_fsufix_ext = [{self.get_fp_for_fn_as_name_fsufix_ext_bksufix(bksufix_example)}]
     """
     return outstr
 
@@ -1223,6 +1248,15 @@ def process():
     downloader.process()
 
 
+def adhoc_test4():
+  ose = OSEntry(
+    workdir_abspath='.',
+    basefilename='bla [123abcABC-_].mp4',
+    videoonly_or_audio_code=160
+  )
+  print(ose)
+
+
 def adhoc_test3():
   t = 'https://www.youtube.com/watch?v=Gjg471uIL9k&pp=wgIGCgQQAhgD'
   ytid = extract_ytid_from_yturl_or_itself_or_none(t)
@@ -1256,6 +1290,5 @@ if __name__ == '__main__':
   """
   adhoc_test1()
   adhoc_test2()
-  adhoc_test3()
   """
   process()
