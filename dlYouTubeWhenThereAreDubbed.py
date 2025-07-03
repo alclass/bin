@@ -44,7 +44,6 @@ Care with the use of parameter --useinputfile:
   however, this script (and this is reinforced below) does not know beforehand if a video
    has or doesn't have a specific language for it.
 
-
 Explanation
 ===========
 
@@ -147,7 +146,7 @@ import shutil
 import string
 import subprocess
 import sys
-# from localuserpylib.pydates import localpydates as pydates
+import localuserpylib.ytfunctions.yt_sufix_lang_map_fs as ytsufixlang
 DEFAULT_AUDIOVIDEO_CODE = 160
 DEFAULT_AUDIOVIDEO_DOT_EXT = '.mp4'
 DEFAULT_YTIDS_FILENAME = 'youtube-ids.txt'
@@ -530,12 +529,14 @@ class Downloader:
     self.videoonlycode = videoonlycode
     self.audioonlycodes = audioonlycodes  # example: ['233-0', '233-1']
     self.treat_input()
+    self.ytsufixlang_o = ytsufixlang.SufixLanguageMapFinder(self.audioonlycodes)
     self.b_verified_once_tmpdir_abspath = None
     self.video_canonical_name = None  # this is the video filename with the f-sufix, it's known after download
     self._cur_dot_ext = None
     self.cur_dot_ext = self.DEFAULT_DOT_EXTENSION
     self.previously_existing_filenames_in_tmpdir = []
     self.n_ongoing_lang = 0
+    self.lang_map = {}  # this dict has {sufix: 2-letter-langid}
     self.osentry = OSEntry(
       workdir_abspath=self.child_tmpdir_abspath,
       basefilename=None,  # later to be known
@@ -567,6 +568,12 @@ class Downloader:
     pdict = {'ytid': self.ytid}
     url = self.video_baseurl.format(**pdict)
     return url
+
+  def get_lang2lettercode_fr_audioonlycode(self, audioonlycode):
+    """
+    audioonlycode = self.audioonlycodes[self.n_ongoing_lang-1]
+    """
+    return self.ytsufixlang_o.get_lang2lettercode_fr_audioonlycode(audioonlycode)
 
   def rename_canofile_to_the_bk1sufixed(self):
     """
@@ -1066,7 +1073,9 @@ class Downloader:
     srccanofilepath = self.osentry.fp_for_fn_as_name_ext
     srccanofilename = self.osentry.fp_for_fn_as_name_ext
     audioonlycode = self.audioonlycodes[self.n_ongoing_lang-1]
-    langprefix = f"lang{self.n_ongoing_lang}_{audioonlycode}"
+    langprefix = self.get_lang2lettercode_fr_audioonlycode(audioonlycode)
+    # "vd1" stands for "video 1", an idea is to make it possible for an increment (ex video 2, 3...) if needed
+    langprefix = f"vd1-{langprefix}"
     langprefixedfilename = f"{langprefix} {self.osentry.fn_as_name_ext}"
     langprefixedfilepath = os.path.join(self.osentry.workdir_abspath, langprefixedfilename)
     if not os.path.isfile(srccanofilepath):
