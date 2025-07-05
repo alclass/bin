@@ -141,23 +141,14 @@ Limitation: what does this script not do (at least yet)?
 """
 import argparse
 import os.path
-import re
 import shutil
-import string
 import subprocess
 import sys
-import localuserpylib.ytfunctions.yt_sufix_lang_map_fs as ytsufixlang
+import localuserpylib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
+DEFAULT_YTIDS_FILENAME = 'youtube-ids.txt'
 DEFAULT_AUDIOVIDEO_CODE = 160
 DEFAULT_AUDIOVIDEO_DOT_EXT = '.mp4'
-DEFAULT_YTIDS_FILENAME = 'youtube-ids.txt'
 REGISTERED_VIDEO_DOT_EXTENSIONS = ['.mp4', '.mkv', '.webm', '.m4v', '.avi', '.wmv']
-YTID_CHARSIZE = 11
-enc64_valid_chars = string.digits + string.ascii_lowercase + string.ascii_uppercase + '_-'
-# Example for the regexp below: https://www.youtube.com/watch?v=abcABC123_-&pp=continuation
-ytid_url_regexp_pattern = r'watch\?v=([A-Za-z0-9_-]{11})(?=(&|$))'
-cmpld_ytid_url_re_pattern = re.compile(ytid_url_regexp_pattern)
-ytid_in_ytdlp_filename_pattern = r'\[([A-Za-z0-9_-]{11})\]'
-cmpld_ytid_in_ytdlp_filename_pattern = re.compile(ytid_in_ytdlp_filename_pattern)
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Compress videos to a specified resolution.")
 parser.add_argument("--ytid", type=str,
@@ -171,75 +162,6 @@ parser.add_argument("--videoonlycode", type=str, default="160",
 parser.add_argument("--audioonlycodes", type=str, default="233-0,233-1",
                     help="audio only codes: example: 233-0,233-1")
 args = parser.parse_args()
-
-
-def is_str_enc64(line: str | None) -> bool:
-  blist = list(map(lambda c: c in enc64_valid_chars, line))
-  if False in blist:
-    return False
-  return True
-
-
-def is_str_a_ytid(ytid: str | None) -> bool:
-  if ytid is None or len(ytid) != YTID_CHARSIZE:
-    return False
-  return is_str_enc64(ytid)
-
-
-def extract_ytid_from_yturl_or_itself_or_none(p_supposed_ytid: str | None) -> str | None:
-  """
-  Extracts ytid from a larger string (incluing a URL)
-  Noting:
-    if ytid is None, return None
-    if ytid is already "in shape", return it as is
-    if ytid is a larger string, try to extract a valid "ytid" from it
-    if extraction fails, return None
-
-  Example of an extraction from a yt_url:
-    url = "https://www.youtube.com/watch?v=abcABC123_-&pp=continuation"
-  The extraction result is:
-    ytid = "abcABC123_-"
-
-    Obs: "abcABC123_-" in the example is hypothetical (an ENC64 11-char string)!
-  """
-  if p_supposed_ytid is None:
-    return None
-  if is_str_a_ytid(p_supposed_ytid):
-    ytid = p_supposed_ytid
-    return ytid
-  match = cmpld_ytid_url_re_pattern.search(p_supposed_ytid)
-  return match.group(1) if match else None
-
-
-def read_ytids_from_default_file_n_get_as_list(p_dlddir_abspath, ytids_filename=None):
-  if ytids_filename is None:
-    ytids_filename = DEFAULT_YTIDS_FILENAME
-  inputfilepath = os.path.join(p_dlddir_abspath, ytids_filename)
-  lines = open(inputfilepath, 'r').readlines()
-  lines = map(lambda line: line[:YTID_CHARSIZE] if len(line) > 10 else '', lines)
-  ytdis = filter(lambda line: len(line) == YTID_CHARSIZE, lines)
-  ytdis = list(filter(lambda line: is_str_enc64(line), ytdis))
-  return ytdis
-
-
-def verify_ytid_validity_or_raise(ytid):
-  if not is_str_a_ytid(ytid):
-    errmsg = (
-      f"""
-      Please check the value entered for/with ytid
-        => its entered value is "{ytid}"
-
-      Rules for a valid ytid:
-      =======================
-      a) it must have {YTID_CHARSIZE} characters
-      b) all of them must be ENC64 *
-
-      * All 64 ENC64 characters are: "{enc64_valid_chars}"
-
-      Please, correct the observations(s) above and retry.
-      """
-    )
-    raise ValueError(errmsg)
 
 
 class OSEntry:
@@ -319,7 +241,7 @@ class OSEntry:
     try:
       sufix = self.name[-13:]
       ytid = sufix.lstrip('[').rstrip(']')
-      if not is_str_a_ytid(ytid):
+      if not ytstrfs.is_str_a_ytid(ytid):
         return None
       return ytid
     except (IndexError, ValueError):
@@ -529,7 +451,7 @@ class Downloader:
     self.videoonlycode = videoonlycode
     self.audioonlycodes = audioonlycodes  # example: ['233-0', '233-1']
     self.treat_input()
-    self.ytsufixlang_o = ytsufixlang.SufixLanguageMapFinder(self.audioonlycodes)
+    self.ytsufixlang_o = ytstrfs.SufixLanguageMapFinder(self.audioonlycodes)
     self.b_verified_once_tmpdir_abspath = None
     self.video_canonical_name = None  # this is the video filename with the f-sufix, it's known after download
     self._cur_dot_ext = None
@@ -545,7 +467,7 @@ class Downloader:
     # self.va_osentry = []
 
   def treat_input(self):
-    verify_ytid_validity_or_raise(self.ytid)
+    ytstrfs.verify_ytid_validity_or_raise(self.ytid)
     if self.dlddir_abspath is None:
       # default is the current working directory
       self.dlddir_abspath = os.path.abspath('.')
@@ -1195,7 +1117,7 @@ def get_cli_args():
 
 def confirm_cli_args_with_user():
   ytid, b_useinputfile, dirpath, videoonlycode, audioonlycodes = get_cli_args()
-  ytid = extract_ytid_from_yturl_or_itself_or_none(ytid)
+  ytid = ytstrfs.extract_ytid_from_yturl_or_itself_or_none(ytid)
   print(ytid, 'b_useinputfile', b_useinputfile, dirpath, videoonlycode, audioonlycodes)
   if not os.path.isdir(dirpath):
     scrmsg = "Source directory [{src_rootdir_abspath}] does not exist. Please, retry."
@@ -1235,6 +1157,15 @@ def confirm_cli_args_with_user():
   return confirmed, b_useinputfile, ytid, dirpath, videoonlycode, audioonlycodes
 
 
+def get_default_ytids_filepath(p_dirpath):
+  ytids_filename = DEFAULT_YTIDS_FILENAME
+  default_ytids_filepath = os.path.join(p_dirpath, ytids_filename)
+  if not os.path.isfile(default_ytids_filepath):
+    errmsg = f"YTIDs filepath [{default_ytids_filepath}] does not exist. Please, create it and retry."
+    raise OSError(errmsg)
+  return default_ytids_filepath
+
+
 def process():
   """
   """
@@ -1242,7 +1173,7 @@ def process():
   if not confirmed:
     return
   if b_useinputfile:
-    ytids = read_ytids_from_default_file_n_get_as_list(dirpath)
+    ytids = ytstrfs.read_ytids_from_file_n_get_as_list(get_default_ytids_filepath(dirpath))
   else:
     ytids = [ytid]
   scrmsg = f'Entered ytid(s) is/are: {ytids}'
@@ -1257,7 +1188,7 @@ def process():
     downloader.process()
 
 
-def adhoc_test4():
+def adhoc_test2():
   ose = OSEntry(
     workdir_abspath='.',
     basefilename='bla [123abcABC-_].mp4',
@@ -1266,33 +1197,11 @@ def adhoc_test4():
   print(ose)
 
 
-def adhoc_test3():
-  t = 'https://www.youtube.com/watch?v=Gjg471uIL9k&pp=wgIGCgQQAhgD'
-  ytid = extract_ytid_from_yturl_or_itself_or_none(t)
-  scrmsg = f"""Testing {t}
-  Resulting {ytid}"""
-  print(scrmsg)
-  t = 'https://www.youtube.com/watch?v=abcABC123_-&pp=continuation'
-  ytid = extract_ytid_from_yturl_or_itself_or_none(t)
-  scrmsg = f"""Testing {t}
-  Resulting {ytid}"""
-  print(scrmsg)
-  # return ytid
-
-
-def adhoc_test2():
-  dirpath = args.dirpath or os.path.abspath('.')
-  # inputfilepath = os.path.join(dirpath, DEFAULT_YTIDS_FILENAME)
-  ytids = read_ytids_from_default_file_n_get_as_list(dirpath)
-  scrmsg = f"adhoc_test2 :: ytids = {ytids}"
-  print(scrmsg)
-
-
 def adhoc_test1():
   ytid = 'abc+10'
   scrmsg = f'Testing verify_ytid_validity_or_raise({ytid})'
   print(scrmsg)
-  verify_ytid_validity_or_raise(ytid)
+  ytstrfs.verify_ytid_validity_or_raise(ytid)
 
 
 if __name__ == '__main__':

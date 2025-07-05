@@ -1,7 +1,150 @@
 #!/usr/bin/env python3
 """
-localuserpylib/ytfunctions/yt_sufix_lang_map_fs.py
+localuserpylib/ytfunctions/yt_str_fs_vids_sufix_lang_map_etc.py
 """
+import os
+import string
+import re
+YTID_CHARSIZE = 11
+enc64_valid_chars = string.digits + string.ascii_lowercase + string.ascii_uppercase + '_-'
+# Example for the regexp below: https://www.youtube.com/watch?v=abcABC123_-&pp=continuation
+ytid_url_w_watch_regexp_pattern = r'watch\?v=([A-Za-z0-9_-]{11})(?=(&|$))'
+cmpld_ytid_url_w_watch_re_pattern = re.compile(ytid_url_w_watch_regexp_pattern)
+ytid_in_ytdlp_filename_pattern = r'\[([A-Za-z0-9_-]{11})\]'
+cmpld_ytid_in_ytdlp_filename_pattern = re.compile(ytid_in_ytdlp_filename_pattern)
+ytid_instr_af_equalsign = r'\=([A-Za-z0-9_-]{11})(?=(&|$))'
+cmpld_ytid_instr_af_equalsign_pattern = re.compile(ytid_instr_af_equalsign)
+ytvideobaseurl = "https://www.youtube.com/watch?v="
+
+
+def is_str_enc64(line: str | None) -> bool:
+  blist = list(map(lambda c: c in enc64_valid_chars, line))
+  if False in blist:
+    return False
+  return True
+
+
+def is_str_a_ytid(ytid: str | None) -> bool:
+  if ytid is None or len(ytid) != YTID_CHARSIZE:
+    return False
+  return is_str_enc64(ytid)
+
+
+def get_match_ytid_af_equalsign_or_itself(line):
+  """
+  Gets a ytid after an "=" (equal sign) or returns the input itself
+  :return:
+  """
+  match = cmpld_ytid_instr_af_equalsign_pattern.search(line)
+  return line if match is None else match.group(1)
+
+
+def extract_ytid_from_yturl_or_itself_or_none(p_supposed_ytid: str | None) -> str | None:
+  """
+  Extracts ytid from a YouTube-type URL (when ytid is preceded by '?watch=')
+  Noting:
+    if ytid is None, return None
+    if ytid is already a 'ytid sole', return it as is
+    if ytid is preceded by '?watch=', match/extract/return ytid
+    if regex above can't match, return None
+
+  Example of an extraction from a YouTube-like URL:
+    url = "https://www.youtube.com/watch?v=abcABC123_-&pp=continuation"
+  The extraction result is:
+    ytid = "abcABC123_-"
+
+    Obs: "abcABC123_-" in the example is hypothetical (an ENC64 11-char string)!
+  """
+  if p_supposed_ytid is None:
+    return None
+  if is_str_a_ytid(p_supposed_ytid):
+    ytid = p_supposed_ytid
+    return ytid
+  match = cmpld_ytid_url_w_watch_re_pattern.search(p_supposed_ytid)
+  return match.group(1) if match else None
+
+
+def leftstrip_ytvideourl_out_of_str(s: str | None) -> str:
+  """
+  Returns the input string left-stripped of the YouTube's base-URL
+      or empty '' (if input is None or empty)
+      or itself (i.e., the input as is)
+    Obs: input comes here already passed through a strip(whitespace) operation,
+         so this first stripping is not needed at this point
+  :param s:
+  :return: s (filtered)
+  """
+  if s is None or s == '':
+    return ''
+  base = ytvideobaseurl
+  if s.startswith(base):
+    return s.strip(base)
+  else:
+    return s
+
+
+def read_ytids_from_strlines(strlines: list | None) -> list:
+  """
+  Filters a str list into a list of ytid's
+
+  The data text (here incoming as str lines) must be formed in two ways,
+    they are:
+      1 - either its ytid is at the beginning (white space ' \t\r\n is filtered out)
+      2 - or its ytid is in a URL of the following kind:
+        2-1 one with '=' (an equal sign) preceding the ytid
+        Obs: in an obvious way, that will also include '?watch=' preceding the ytid
+  """
+  # strip left and right whitespace ' \t\r\n'
+  lines = map(lambda line: line.strip(' \t\r\n'), strlines)
+  # lines = list(lines)
+  # left-strip beginning YouTube base URL in lines if any
+  lines = filter(lambda line: leftstrip_ytvideourl_out_of_str(line), lines)
+  # further than the filter above, remove lines if it has a ytid after the '=' sign
+  # lines = list(lines)
+  # pick up ytid's in string when they happen after '=' (the equal sign)
+  lines = map(lambda line: get_match_ytid_af_equalsign_or_itself(line), lines)
+  # lines = list(lines)
+  # remove lines if it does not have exactly 11-char (YTID_CHARSIZE)
+  ytdis = filter(lambda line: len(line) == YTID_CHARSIZE, lines)
+  # ytdis = list(ytdis)
+  # remove from the remaining 11-char lines those not ENC64-complying
+  ytdis = list(filter(lambda line: is_str_enc64(line), ytdis))
+  return ytdis
+
+
+def read_ytids_from_file_n_get_as_list(p_filepath: os.path) -> list:
+  """
+  Reads text data file and returns its str lines
+
+    Obs:
+      At this version, OSError or IOError try/except was not implemented below,
+      but if path or file is missing or a disk error occurs, an exception is expected
+
+  """
+  if p_filepath is None or not os.path.isfile(p_filepath):
+    return []
+  strlines = open(p_filepath, 'r').readlines()
+  return read_ytids_from_strlines(strlines)
+
+
+def verify_ytid_validity_or_raise(ytid):
+  if not is_str_a_ytid(ytid):
+    errmsg = (
+      f"""
+      Please check the value entered for/with ytid
+        => its entered value is "{ytid}"
+
+      Rules for a valid ytid:
+      =======================
+      a) it must have {YTID_CHARSIZE} characters
+      b) all of them must be ENC64 *
+
+      * All 64 ENC64 characters are: "{enc64_valid_chars}"
+
+      Please, correct the observations(s) above and retry.
+      """
+    )
+    raise ValueError(errmsg)
 
 
 def get_nsufix_fr_audioonlycode(audioonlycode: str | None) -> int | None:
@@ -173,7 +316,12 @@ class SufixLanguageMapFinder:
     return self.get_lang2lettercode_fr_numbersufix(nsufix)
 
   def process(self):
-    # this method initializes 'lazy' attributes
+    """
+    This method, using the 'process' name as a convention,
+      calls another method that will initialize (lazily)'
+      all the object's attributes
+    :return:
+    """
     self.get_sufix_lang_dict()
 
   def print_sufix_lang_map(self):
@@ -186,10 +334,59 @@ class SufixLanguageMapFinder:
     return outstr
 
 
+def adhoc_test4():
+  print('-'*30)
+  print('adhoc_test4: cmpld_ytid_instr_af_equalsign_pattern')
+  t = 'https://www.youtube.com/watch?v=Gjg471uIL9k&pp=wgIGCgQQAhgD'
+  print(t)
+  match = cmpld_ytid_instr_af_equalsign_pattern.search(t)
+  if match:
+    print(match.group(1))
+  else:
+    print("didn't match")
+
+
+def adhoc_test3():
+  print('-'*30)
+  print('adhoc_test3: extract_ytid_from_yturl_or_itself_or_none')
+  t = 'https://www.youtube.com/watch?v=Gjg471uIL9k&pp=wgIGCgQQAhgD'
+  ytid = extract_ytid_from_yturl_or_itself_or_none(t)
+  scrmsg = f"""Testing {t}
+  Resulting {ytid}"""
+  print(scrmsg)
+  t = 'https://www.youtube.com/watch?v=abcABC123_-&pp=continuation'
+  ytid = extract_ytid_from_yturl_or_itself_or_none(t)
+  scrmsg = f"""Testing {t}
+  Resulting {ytid}"""
+  print(scrmsg)
+  # return ytid
+
+
+def adhoc_test2():
+  """
+  https://www.youtube.com/watch?v=GnFNf7Q7tH4
+  https://www.youtube.com/watch?v=_8iL9SdyJng
+
+  :return:
+  """
+  print('-'*30)
+  print('adhoctest2: extracting ytid from strings when ytid comes after "="')
+  strlines = []
+  url = 'https://www.youtube.com/watch?v=GnFNf7Q7tH4'
+  strlines.append(url)
+  print(1, url)
+  url = 'https://www.youtube.com/watch?v=_8iL9SdyJng'
+  strlines.append(url)
+  print(2, url)
+  result = read_ytids_from_strlines(strlines)
+  print('result', result)
+
+
 def adhoc_test1():
   """
   """
-  # example 1
+  print('-'*30)
+  print('adhoctest1: SufixLanguageMapFinder')
   print('='*20)
   print('example 1')
   print('='*20)
@@ -231,7 +428,12 @@ def process():
 
 if __name__ == '__main__':
   """
-  adhoc_test2()
-  """
   process()
   adhoc_test1()
+  adhoc_test2()
+  adhoc_test3()
+  """
+  adhoc_test1()
+  adhoc_test2()
+  adhoc_test3()
+  adhoc_test4()
