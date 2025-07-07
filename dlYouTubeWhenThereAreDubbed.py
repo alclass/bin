@@ -145,6 +145,7 @@ import shutil
 import subprocess
 import sys
 import localuserpylib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
+import localuserpylib.regexfs.filenamevalidator_cls as fnval  # .FilenameValidator
 DEFAULT_YTIDS_FILENAME = 'youtube-ids.txt'
 DEFAULT_AUDIOVIDEO_CODE = 160
 DEFAULT_AUDIOVIDEO_DOT_EXT = '.mp4'
@@ -668,46 +669,45 @@ class Downloader:
 
   def discover_dldd_videofilename(self):
     """
-    The old discovery method was based on a comparison before versus after.
-    This new one is based on searching for a file with ytid in its name.
+    Discovers the filename of the downloaded yt-dlp file
+
+    However, when a download is incomplete, the following info is important.
+
+    The discovery process is easy when the download process in not interrupted,
+      but tricky if the user is continuing a previous incomplete download.
+
+    When a download process is completed, a prefix is prepended to the filenames.
+
+    When download process is incomplete and the user restarts it,
+      this script makes a "strong" supposition", .i.e., one
+      to consider the canonical filename, if present, representing the video-only-file.
+
+    * Chances are this is correct, but, if not, the user should restart from an empty directory.
+
+    How to discovery works
+    =======================
+
+    Before making the "strong assumption" above, the script compares the directory contents
+      looking for a new file (comparasion before versus after). This is the first try.
+
+    The second try starts when, after the first try, a new recent file is not found.
+    The second is based on a "strong supposition". This assumption may delineate as follows:
+      1 - a previous download happened, but it's incomplete
+      2 - a look-up for the canonical file in folder will be interpreted as the video-only-file
+
+    The user should know this detail because if this hypothesis is wrong, the result may be wrong.
+    Another hypothesis is a failure in the last renaming of the last run, i.e., the download was completed,
+      and the user is restarting a new one actually without need.
+
+    If the second try does not find a file, the third try asks the user which filename
+      is the correct one.
     """
-    filenames = os.listdir(self.osentry.workdir_abspath)
-    filenames = filter(lambda f: self.ytid in f, filenames)
-    filenames = list(filter(lambda f: f.endswith(tuple(self.video_dot_extensions)), filenames))
-    if len(filenames) == 1:
-      filename_found = filenames[0]
-      scrmsg = f"""At after-download file discovery:
-      ytid = {self.ytid}
-      found = {filename_found}"""
-      print(scrmsg)
-    else:
-      filename_found = self.fallbackcase_ask_user_what_the_downloaded_filename_is()
-    self.osentry.basefilename = filename_found
-
-  def discover_dldd_videofilename_old(self):
-    """
-    Because a temporary dir is created for the download,
-      one expects there will be only one videofile (*) after the first download happens
-        and its name will be just easy to find out by looking dir-contents
-
-    However, this script is also prepared to work with a legacy tmpdir (perhaps having mix files)
-      and this poses a problem:
-      if the sought-for file was already downloaded before running the script
-      (because this script does not know what the downloaded filename will be
-        except by comparing dir-contents: before and after)
-
-    This method looks for one file (and one only)
-      with a video extension (*):
-      1 - it looks for a filename that is not inside the previously stored videofilenames list
-      2 - if it can't find it (the hypothesis given above), it asks the user for that
-      3 - if the user can't find it either, this script then asks for the user to retry after cleaning up tmpdir,
-          ie, leaving it empty for the new run
-
-    (*) The extension list for videos is hardcoded for the time being
-        i.e., it's a (static attribute) list at the class root level
-    """
-    allfilenames = os.listdir('.')  # notice an os.chdir(<dld_dir>) happened before
+    videofilename_soughtfor = None
+    allfilenames = os.listdir(self.osentry.workdir_abspath)
     dot_ext = self.cur_dot_ext
+    # ----------
+    # first try: folder contents comparison (before versus after)
+    # ----------
     videofilenames = filter(lambda f: f.endswith(dot_ext), allfilenames)
     videofilenames_appearing_after = list(
       filter(
@@ -716,12 +716,37 @@ class Downloader:
       )
     )
     n_results = len(videofilenames_appearing_after)
-    if n_results == 0 or n_results > 1:
-      videofilename_soughtfor = self.fallbackcase_ask_user_what_the_downloaded_filename_is()
-    else:
+    if n_results == 1:
       videofilename_soughtfor = videofilenames_appearing_after[0]
-    scrmsg = f"osentry.basefilename videofilename_soughtfor = {videofilename_soughtfor}"
-    print(scrmsg)
+      scrmsg = f"Found downloaded file as [{videofilename_soughtfor}]"
+      print(scrmsg)
+    else:
+      # at this point, some hypotheses come to mind
+      # 1 - directory may be empty (which might signal a network failure)
+      # 2 - file had already been downloaded before, so the comparison before versus after does not find it
+      # 3 - if 2 is so, the second try below may find it, but if this hypothesis is wrong and
+      #     an error happened in the final renaming of last run,
+      #     this solution will not be the correct one (at any rate, if the user finds it incorrect,
+      #     a new start should be done on an empty working directory)
+      # ----------
+      # second try: look up filename's canonical form
+      # ----------
+      scrmsg = f"Looking up the downloaded file among {len(allfilenames)} files in folder"
+      print(scrmsg)
+      for fn in allfilenames:
+        # filename is compliant to the "canonical filename", i.e., name[ytid].ext
+        validator = fnval.FilenameValidator(filename=fn)
+        if validator.is_filename_a_valid_ytdlp and self.ytid == validator.ytid:
+          # found it (it has the canonical form and the same ytid, that's it [unique])
+          videofilename_soughtfor = fn
+          scrmsg = f"Found downloaded file as [{videofilename_soughtfor}]"
+          print(scrmsg)
+          break
+    if videofilename_soughtfor is None:
+      # ----------
+      # third (and last) try: ask the user
+      # ----------
+      videofilename_soughtfor = self.fallbackcase_ask_user_what_the_downloaded_filename_is()
     self.osentry.basefilename = videofilename_soughtfor
     scrmsg = f"Discovered videofilename after download: [{self.osentry.fn_as_name_ext}]"
     print(scrmsg)
@@ -741,9 +766,15 @@ class Downloader:
            and this bksufix is not used in this method
     """
     if os.path.isfile(self.osentry.fp_for_fn_as_name_fsufix_ext):
-      scrmsg = f"""Not renaming to fsufixed_videoonlyfilename [{self.osentry.fn_as_name_fsufix_ext}]
-       as it already exists. Continuing."""
+      scrmsg = f"""Not renaming to the f-sufixed ({self.osentry.fsufix}) video-only-filename:
+         => [{self.osentry.fn_as_name_fsufix_ext}]
+       as it already exists in the working directory.
+       ---------------
+       Script is going to delete the canonical file [{self.osentry.fn_as_name_ext}] 
+       so that after the next language download yt-dlp will be able to blend audio with video."""
       print(scrmsg)
+      os.remove(self.osentry.fp_for_fn_as_name_ext)
+      print('Canonical file deleted. Continuing.')
       return False
     try:
       os.rename(self.osentry.fp_for_fn_as_name_ext, self.osentry.fp_for_fn_as_name_fsufix_ext)
@@ -1195,6 +1226,9 @@ def adhoc_test2():
     videoonly_or_audio_code=160
   )
   print(ose)
+  fn = "REDE GLOBO SE INCOMODA COM VÍDEOS DE IA CONTRA O CONGRESSO NACIONAL [D6anIztaYCE].f160.mp4"
+  fnvalidator = fnval.FilenameValidator(filename=fn)
+  print(fnvalidator)
 
 
 def adhoc_test1():
