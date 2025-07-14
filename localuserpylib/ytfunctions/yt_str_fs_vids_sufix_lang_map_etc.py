@@ -296,7 +296,7 @@ class SufixLanguageMapFinder:
         sufixnumber = int(sufixnumber)
         if sufixnumber > 1:
           self.eng_sufix = 8 if sufixnumber < 9 else 9
-      except AttributeError:
+      except (AttributeError, IndexError):
         pass
     if self.eng_sufix > 0:
       return self.make_lang_map_via_eng_ori()
