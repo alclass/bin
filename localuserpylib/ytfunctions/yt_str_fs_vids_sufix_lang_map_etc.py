@@ -252,6 +252,17 @@ class SufixLanguageMapFinder:
     self.lang_map = {0: 'en', 1: 'pt'}  # the user must filerename 'pt' for the correct one
     return self.lang_map
 
+  def find_sufix_number_either_dub_eng_or_ori_eng(self):
+    for audioonlycode in self.audioonlycodes:
+      try:
+        audiocode_n_sufixnumber = audioonlycode.split('-')
+        sufixnumber = audiocode_n_sufixnumber[1]
+        sufixnumber = int(sufixnumber)
+        if sufixnumber > 1:
+          self.eng_sufix = 8 if sufixnumber < 9 else 9
+      except (AttributeError, IndexError):
+        self.eng_sufix = 0
+
   def get_sufix_lang_dict(self):
     """
     the lang_dict maps the number sufix in audio-only-codes to
@@ -289,15 +300,8 @@ class SufixLanguageMapFinder:
     if self.lang_map is not None:
       return self.lang_map
     self.eng_sufix = 0  # until proven differently
-    for audioonlycode in self.audioonlycodes:
-      try:
-        audiocode_n_sufixnumber = audioonlycode.split('-')
-        sufixnumber = audiocode_n_sufixnumber[1]
-        sufixnumber = int(sufixnumber)
-        if sufixnumber > 1:
-          self.eng_sufix = 8 if sufixnumber < 9 else 9
-      except (AttributeError, IndexError):
-        pass
+    # the next for is to establish English either as sufix 0 or 8 or 9
+    self.find_sufix_number_either_dub_eng_or_ori_eng()
     if self.eng_sufix > 0:
       return self.make_lang_map_via_eng_ori()
     return self.make_lang_map_via_noneng_ori()
