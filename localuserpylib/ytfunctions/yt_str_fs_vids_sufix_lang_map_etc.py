@@ -260,7 +260,7 @@ class SufixLanguageMapFinder:
         sufixnumber = int(sufixnumber)
         if sufixnumber > 1:
           self.eng_sufix = 8 if sufixnumber < 9 else 9
-      except (AttributeError, IndexError):
+      except (AttributeError, IndexError, ValueError):
         self.eng_sufix = 0
 
   def get_sufix_lang_dict(self):

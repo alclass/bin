@@ -1146,12 +1146,9 @@ def get_cli_args():
   return ytid, boo_readfile, dirpath, videoonlycode, audioonlycodes
 
 
-def confirm_cli_args_with_user():
-  ytid, b_useinputfile, dirpath, videoonlycode, audioonlycodes = get_cli_args()
-  ytid = ytstrfs.extract_ytid_from_yturl_or_itself_or_none(ytid)
-  print(ytid, 'b_useinputfile', b_useinputfile, dirpath, videoonlycode, audioonlycodes)
+def confirm_cli_args_with_user(ytids, dirpath, videoonlycode, audioonlycodes):
   if not os.path.isdir(dirpath):
-    scrmsg = "Source directory [{src_rootdir_abspath}] does not exist. Please, retry."
+    scrmsg = f"Source directory [{dirpath}] does not exist. Please, retry."
     print(scrmsg)
     return False
   try:
@@ -1163,29 +1160,28 @@ def confirm_cli_args_with_user():
   try:
     audioonlycodes = audioonlycodes.split(',')
   except ValueError:
-    scrmsg = f"audioonlycodes [{audioonlycodes}] should be a list of numbers with possible sufixes. Please, retry"
+    scrmsg = (f"audioonlycodes [{audioonlycodes}] should be a number list with possible sufixes."
+              f" (@see also docstr for more info). Please, retry.")
     print(scrmsg)
     return False
+  charrule = '=' * 20
+  print(charrule)
   print('Paramters')
-  print('='*20)
-  scrmsg = f"ytid = [{ytid}]"
+  print(charrule)
+  scrmsg = f"""Input parameters entered:
+  ytids = {ytids}
+  dirpath = {dirpath}
+  videoonlycode = {videoonlycode} | audioonlycodes = {audioonlycodes} 
+  """
   print(scrmsg)
-  scrmsg = f"useinputfile = [{b_useinputfile}]"
-  print(scrmsg)
-  scrmsg = f"dirpath = [{dirpath}]"
-  print(scrmsg)
-  scrmsg = f"videoonlycode = [{videoonlycode}]"
-  print(scrmsg)
-  scrmsg = f"audioonlycodes = [{audioonlycodes}]"
-  print(scrmsg)
-  print('='*20)
-  scrmsg = "The parameters are okay? (Y/n) [ENTER] means Yes "
+  print(charrule)
+  scrmsg = "The parameters above are okay? (Y/n) [ENTER] means Yes "
   ans = input(scrmsg)
-  print('='*20)
+  print(charrule)
   confirmed = False
   if ans in ['Y', 'y', '']:
     confirmed = True
-  return confirmed, b_useinputfile, ytid, dirpath, videoonlycode, audioonlycodes
+  return confirmed, audioonlycodes
 
 
 def get_default_ytids_filepath(p_dirpath):
@@ -1200,23 +1196,32 @@ def get_default_ytids_filepath(p_dirpath):
 def process():
   """
   """
-  confirmed, b_useinputfile, ytid, dirpath, videoonlycode, audioonlycodes = confirm_cli_args_with_user()
-  if not confirmed:
-    return
+  ytid, b_useinputfile, dirpath, videoonlycode, audioonlycodes_as_str = get_cli_args()
+  ytid = ytstrfs.extract_ytid_from_yturl_or_itself_or_none(ytid)
+  ytids = []
   if b_useinputfile:
     ytids = ytstrfs.read_ytids_from_file_n_get_as_list(get_default_ytids_filepath(dirpath))
+    if ytid:
+      ytids.append(ytid)
   else:
-    ytids = [ytid]
-  scrmsg = f'Entered ytid(s) is/are: {ytids}'
-  print(scrmsg)
+    if ytid:
+      ytids = [ytid]
+  if ytid is None or len(ytids) == 0:
+    scrmsg = "No ytid given. Please, enter at least one ytid."
+    print(scrmsg)
+    return 0
+  confirmed, audioonlycodes_as_list = confirm_cli_args_with_user(ytids, dirpath, videoonlycode, audioonlycodes_as_str)
+  if not confirmed:
+    return False
   for ytid in ytids:
     downloader = Downloader(
       ytid=ytid,
       dlddir_abspath=dirpath,
       videoonlycode=videoonlycode,
-      audioonlycodes=audioonlycodes,
+      audioonlycodes=audioonlycodes_as_list,
     )
     downloader.process()
+  return True
 
 
 def adhoc_test2():
