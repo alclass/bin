@@ -941,6 +941,27 @@ class Downloader:
       print(errmsg)
       sys.exit(1)
 
+  def delete_all_lang_subcodes_afterfallback(self):
+    """
+    Deletes all audioonlycodes after ongoing_index in queue (list)
+
+    This happens when the fallback method is called, which
+      means that this script has decided (supposion as designed)
+      that the video in question does not have language subcodes.
+
+    For example:
+      Suppose an attempt to download audioonlycode 233-0 fails
+      returning exit 1. After that it retries with audioonlycode 233
+      (audioonlycode without a dash number).
+      Okay. Suppose that originally the queue is 233-0, 233-1, 233-2
+      But, in this case, all subsequent dash-numbers (-1 and -2)
+      in queue must be removed.
+
+      This method does this emptying of the queue.
+    """
+    while self.n_ongoing_lang < len(self.audioonlycodes) - 1:
+      _ = self.audioonlycodes.pop()
+
   def fallback_to_nondashed_audiocode_changing_it(self):
     """
     The strategy here is the following:
@@ -968,8 +989,7 @@ class Downloader:
       self.audioonlycodes[self.n_ongoing_lang] = newaudiocode
       # let's also delete anything further on this index-point
       # (the reason is that translations do not exist without dash-numbers)
-      if self.n_ongoing_lang < len(self.audioonlycodes) - 2:
-        del self.audioonlycodes[self.n_ongoing_lang+1:]
+      self.delete_all_lang_subcodes_afterfallback()
     except IndexError:
       scrmsg = f"""WARNING: 
       could not derive a non-dashed-sufix.
@@ -1009,7 +1029,7 @@ class Downloader:
       Subprocess returned with an error:
       Command failed with return code {e.returncode}: {comm}
       full error msg => {e}
-      => trying a download with an audiocode with the dashed-sufix
+      => trying a download without an audiocode with the dashed-sufix
       =+=|=+=|=+=|=+=|=+=|=+=|=+=|=+=|=+=|=+=|=+=|=+=|=+=|=+=|
       """
       print(errmsg)
