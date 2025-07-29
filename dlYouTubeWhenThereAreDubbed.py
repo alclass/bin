@@ -150,6 +150,7 @@ DEFAULT_YTIDS_FILENAME = 'youtube-ids.txt'
 DEFAULT_AUDIOVIDEO_CODE = 160
 DEFAULT_AUDIOVIDEO_DOT_EXT = '.mp4'
 REGISTERED_VIDEO_DOT_EXTENSIONS = ['.mp4', '.mkv', '.webm', '.m4v', '.avi', '.wmv']
+default_videodld_tmpdir = 'videodld_tmpdir'
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Compress videos to a specified resolution.")
 parser.add_argument("--ytid", type=str,
@@ -433,7 +434,7 @@ class Downloader:
   # class-wide static constants
   DEFAULT_VIDEO_ONLY_CODE = 160
   DEFAULT_AUDIO_ONLY_CODES = ['233-0', '233-1']
-  videodld_tmpdirname = 'videodld_tmpdir'
+  videodld_tmpdirname = default_videodld_tmpdir
   video_dot_extensions = REGISTERED_VIDEO_DOT_EXTENSIONS
   DEFAULT_DOT_EXTENSION = '.mp4'
   # class-wide static interpolable-string constants
@@ -1166,16 +1167,19 @@ def confirm_cli_args_with_user(ytids, dirpath, videoonlycode, audioonlycodes):
     return False
   charrule = '=' * 20
   print(charrule)
-  print('Paramters')
+  print('Input parameters entered')
   print(charrule)
-  scrmsg = f"""Input parameters entered:
-  ytids = {ytids}
-  dirpath = {dirpath}
-  videoonlycode = {videoonlycode} | audioonlycodes = {audioonlycodes} 
+  scrmsg = f"""
+  => ytids = {ytids}:
+  -------------------
+  => dirpath = [{dirpath}]
+  (confer default subdirectory "{default_videodld_tmpdir}" or other)
+  -------------------
+  => videoonlycode = {videoonlycode} | audioonlycodes = {audioonlycodes} 
   """
   print(scrmsg)
   print(charrule)
-  scrmsg = "The parameters above are okay? (Y/n) [ENTER] means Yes "
+  scrmsg = "Are the parameters above okay? (Y/n) [ENTER] means Yes "
   ans = input(scrmsg)
   print(charrule)
   confirmed = False
@@ -1206,7 +1210,7 @@ def process():
   else:
     if ytid:
       ytids = [ytid]
-  if ytid is None or len(ytids) == 0:
+  if len(ytids) == 0:
     scrmsg = "No ytid given. Please, enter at least one ytid."
     print(scrmsg)
     return 0
