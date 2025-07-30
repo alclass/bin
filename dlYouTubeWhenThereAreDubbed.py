@@ -3,8 +3,8 @@
 ~/bin/dlYouTubeWhenThereAreDubbed.py
 
 This script uses yt-dlp to download (YouTube) a video in two or more languages if available
-  (translations in general are autodubbed)
-  (each language forms a separate videofile)
+  (YouTube translations in general are autodubbed)
+  (each dubbed/spoken language forms a separate videofile)
 
 Usage:
 ======
@@ -75,7 +75,7 @@ This script downloads the video-only part exactly once and copies it to each new
 This saves transfer bytes and redownload times, because the n-language resulting videos will be formed,
   each one, by joining its videopart (the same for all languages) with its audiopart (language by language).
 
-For example,
+For example:
   1 suppose a video with available autodubbed translation(s)
   2 suppose also that videoonlycode 160 is available
   3 suppose also that audioonlycodes are available in dubbed Italian (as 233-5) and in the original English (as 233-9)
@@ -108,13 +108,19 @@ An example of language audiocodes, having Portuguese as the original:
   233-1  mp4 audio only    m3u8 [pt-BR] Português (Brasil) - original (default)
 
 This second case (where English is autodubbed) seems more stable in terms of standardized audiocodes.
-The first case (where English is the original) seems to differ "a little" among channels,
-  though "a little", it's enough to "miss the point", at some moment, if applied generally.
+
+The first case (where English is the original) seems to make English have
+  either a "-9" (dash nine), most of the time,
+  or "-8" (dash eight) sometimes.
+
 The user has to use the audiocodes CLI parameter to tell the correct audiocodes (*).
   The default today uses [233-0, 233-1]
-    roughly stable for when English is autodubbed and another language is the original
+    and, as mentioned above, stable for when English is autodubbed
+    and another language is the original.
 
- (*) to see the full list of CLI parameters for this script, run it with --help
+ (*) to see the full list of CLI parameters for this script together with this docstr,
+     run it with --docstr
+     (parameter --help shows all parameters with a short description for each)
      (or scroll up the text to the beginning)
 
 A programatic discovery of these audioonlycodes (mapping language to format code)
@@ -153,10 +159,12 @@ REGISTERED_VIDEO_DOT_EXTENSIONS = ['.mp4', '.mkv', '.webm', '.m4v', '.avi', '.wm
 default_videodld_tmpdir = 'videodld_tmpdir'
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Compress videos to a specified resolution.")
+parser.add_argument("--docstr", action="store_true",
+                    help="show docstr help and exit")
 parser.add_argument("--ytid", type=str,
                     help="the video id")
 parser.add_argument("--useinputfile", action='store_true',
-                    help="read the default input ytids file")
+                    help="read the default ytids input file")
 parser.add_argument("--dirpath", type=str,
                     help="Directory recipient of the download")
 parser.add_argument("--videoonlycode", type=str, default="160",
@@ -164,6 +172,11 @@ parser.add_argument("--videoonlycode", type=str, default="160",
 parser.add_argument("--audioonlycodes", type=str, default="233-0,233-1",
                     help="audio only codes: example: 233-0,233-1")
 args = parser.parse_args()
+
+
+def show_docstrhelp_n_exit():
+  print(__doc__)
+  sys.exit(0)
 
 
 class OSEntry:
@@ -1158,6 +1171,8 @@ def get_cli_args():
       sys.exit(0)
   except AttributeError:
     pass
+  if args.docstr:
+    show_docstrhelp_n_exit()
   ytid = args.ytid
   boo_readfile = args.useinputfile
   # default to the current working directory if none is given
@@ -1234,6 +1249,7 @@ def process():
     scrmsg = "No ytid given. Please, enter at least one ytid."
     print(scrmsg)
     return 0
+  ytids = list(set(ytids))
   confirmed, audioonlycodes_as_list = confirm_cli_args_with_user(ytids, dirpath, videoonlycode, audioonlycodes_as_str)
   if not confirmed:
     return False
