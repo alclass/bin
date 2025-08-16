@@ -318,7 +318,7 @@ def adhoc_test1():
 
 def process():
   """
-  adhoc_test1()
+  adhoctest1()
 
   :return:
   """

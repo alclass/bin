@@ -433,8 +433,8 @@ def process():
 if __name__ == '__main__':
   """
   process()
-  adhoc_test1()
-  adhoc_test2()
+  adhoctest1()
+  adhoctest2()
   adhoc_test3()
   """
   adhoc_test1()

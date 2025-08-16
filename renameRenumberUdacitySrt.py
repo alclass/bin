@@ -170,7 +170,7 @@ def adhoc_test1():
   print('n =', n, ', amount = ', amount, ', strzeroesfilled = ', s)
 
 def main():
-  # adhoc_test1()
+  # adhoctest1()
   # return
   ini_number, delta = get_args()
   renamer = Renamer(ini_number, delta)

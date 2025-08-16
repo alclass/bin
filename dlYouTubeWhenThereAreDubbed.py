@@ -152,8 +152,10 @@ import subprocess
 import sys
 import localuserpylib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
 import localuserpylib.regexfs.filenamevalidator_cls as fnval  # .FilenameValidator
+from wget_urls_in_text_dispatcher import retval
+
 DEFAULT_YTIDS_FILENAME = 'youtube-ids.txt'
-DEFAULT_AUDIOVIDEO_CODE = 160
+DEFAULT_AUDIOVIDEO_CODE = 602  # previously it was 160, both are 256x144 but 602 has become "more available..."
 DEFAULT_AUDIOVIDEO_DOT_EXT = '.mp4'
 REGISTERED_VIDEO_DOT_EXTENSIONS = ['.mp4', '.mkv', '.webm', '.m4v', '.avi', '.wmv']
 default_videodld_tmpdir = 'videodld_tmpdir'
@@ -167,10 +169,12 @@ parser.add_argument("--useinputfile", action='store_true',
                     help="read the default ytids input file")
 parser.add_argument("--dirpath", type=str,
                     help="Directory recipient of the download")
-parser.add_argument("--videoonlycode", type=str, default="160",
+parser.add_argument("--videoonlycode", type=str, default=f"{DEFAULT_AUDIOVIDEO_CODE}",
                     help="video only code: example: 160")
 parser.add_argument("--audioonlycodes", type=str, default="233-0,233-1",
                     help="audio only codes: example: 233-0,233-1")
+parser.add_argument("--nvdseq", type=int, default=1,
+                    help="the sequencial number that accompanies the 'vd' namemarker at the last renaming")
 args = parser.parse_args()
 
 
@@ -286,7 +290,7 @@ class OSEntry:
     return name_ext
 
   @property
-  def fp_for_fn_as_name_ext(self) -> os.path:
+  def fp_for_fn_as_name_ext(self) -> str:
     return os.path.join(self.workdir_abspath, self.fn_as_name_ext)
 
   @property
@@ -333,7 +337,7 @@ class OSEntry:
     return name
 
   @property
-  def fp_for_fn_as_name_fsufix_ext(self) -> os.path:
+  def fp_for_fn_as_name_fsufix_ext(self) -> str:
     return os.path.join(self.workdir_abspath, self.fn_as_name_fsufix_ext)
 
   @staticmethod
@@ -376,7 +380,7 @@ class OSEntry:
     name_fsufix_ext_bksufix = f"{self.fn_as_name_fsufix_ext}{self.get_dot_bksufix(n_bksufix)}"
     return name_fsufix_ext_bksufix
 
-  def get_fp_for_fn_as_name_fsufix_ext_bksufix(self, n_bksufix) -> os.path:
+  def get_fp_for_fn_as_name_fsufix_ext_bksufix(self, n_bksufix) -> str:
     return os.path.join(self.workdir_abspath, self.get_fn_as_name_fsufix_ext_bksufix(n_bksufix))
 
   def rename_canofile_to_next_available_lang_n_prefixed_or_raise(self):
@@ -457,11 +461,13 @@ class Downloader:
   def __init__(
       self,
       ytid: str,
-      dlddir_abspath: (os.path, str) = None,
+      dlddir_abspath: str = None,
       videoonlycode: int = None,
-      audioonlycodes: list = None
+      audioonlycodes: list = None,
+      nvdseq: int = None
     ):
     self.ytid = ytid
+    self.nvdseq = nvdseq or 1
     self.dlddir_abspath = dlddir_abspath
     self.videoonlycode = videoonlycode
     self.audioonlycodes = audioonlycodes  # example: ['233-0', '233-1']
@@ -1059,10 +1065,15 @@ class Downloader:
     """
     srccanofilepath = self.osentry.fp_for_fn_as_name_ext
     srccanofilename = self.osentry.fp_for_fn_as_name_ext
-    audioonlycode = self.audioonlycodes[self.n_ongoing_lang-1]
+    try:
+      # this may happen if a fallback to non_dashed_audioonlycode happened previously
+      # but maybe this one is not the best solution (to think about)
+      audioonlycode = self.audioonlycodes[self.n_ongoing_lang-1]
+    except IndexError:
+      return
     langprefix = self.get_lang2lettercode_fr_audioonlycode(audioonlycode)
     # "vd1" stands for "video 1", an idea is to make it possible for an increment (ex video 2, 3...) if needed
-    langprefix = f"vd1-{langprefix}"
+    langprefix = f"vd{self.nvdseq}-{langprefix}"
     langprefixedfilename = f"{langprefix} {self.osentry.fn_as_name_ext}"
     langprefixedfilepath = os.path.join(self.osentry.workdir_abspath, langprefixedfilename)
     if not os.path.isfile(srccanofilepath):
@@ -1116,6 +1127,11 @@ class Downloader:
     """
     for self.n_ongoing_lang in range(1, self.n_langs + 1):
       self.download_audiopart_to_blend_it_w_videoonly()
+      # TODO test if fallback to non_dashed_number_audiocode happened at this point
+      # the reason is that on_going_lang is not following the indices of list audioonlycodes
+      # an IndexError protection is done inside the next method, but we should still think about a better solution
+      # so that a last renaming may happen to the non_dashed_number_audiocode videofile
+      # the way it is now, this last renaming is done manually, if he/she wants to, by the user
       self.rename_videofile_after_audiovideofusion()
 
   def process(self):
@@ -1179,10 +1195,11 @@ def get_cli_args():
   dirpath = args.dirpath or os.path.abspath(".")
   videoonlycode = args.videoonlycode or None
   audioonlycodes = args.audioonlycodes or []
-  return ytid, boo_readfile, dirpath, videoonlycode, audioonlycodes
+  nvdseq = args.nvdseq or 1
+  return ytid, boo_readfile, dirpath, videoonlycode, audioonlycodes, nvdseq
 
 
-def confirm_cli_args_with_user(ytids, dirpath, videoonlycode, audioonlycodes):
+def confirm_cli_args_with_user(ytids, dirpath, videoonlycode, audioonlycodes, nvdseq):
   if not os.path.isdir(dirpath):
     scrmsg = f"Source directory [{dirpath}] does not exist. Please, retry."
     print(scrmsg)
@@ -1205,7 +1222,7 @@ def confirm_cli_args_with_user(ytids, dirpath, videoonlycode, audioonlycodes):
   print('Input parameters entered')
   print(charrule)
   scrmsg = f"""
-  => ytids = {ytids}:
+  => ytids = {ytids} | total = {len(ytids)} | sequential sufix for the 'vd' namemarker = {nvdseq} 
   -------------------
   => dirpath = [{dirpath}]
   (confer default subdirectory "{default_videodld_tmpdir}" or other)
@@ -1232,10 +1249,29 @@ def get_default_ytids_filepath(p_dirpath):
   return default_ytids_filepath
 
 
+def adhoctest2():
+  ose = OSEntry(
+    workdir_abspath='.',
+    basefilename='bla [123abcABC-_].mp4',
+    videoonly_or_audio_code=160
+  )
+  print(ose)
+  fn = "REDE GLOBO SE INCOMODA COM VÍDEOS DE IA CONTRA O CONGRESSO NACIONAL [D6anIztaYCE].f160.mp4"
+  fnvalidator = fnval.FilenameValidator(filename=fn)
+  print(fnvalidator)
+
+
+def adhoctest1():
+  ytid = 'abc+10'
+  scrmsg = f'Testing verify_ytid_validity_or_raise({ytid})'
+  print(scrmsg)
+  ytstrfs.verify_ytid_validity_or_raise(ytid)
+
+
 def process():
   """
   """
-  ytid, b_useinputfile, dirpath, videoonlycode, audioonlycodes_as_str = get_cli_args()
+  ytid, b_useinputfile, dirpath, videoonlycode, audioonlycodes_as_str, nvdseq = get_cli_args()
   ytid = ytstrfs.extract_ytid_from_yturl_or_itself_or_none(ytid)
   ytids = []
   if b_useinputfile:
@@ -1250,7 +1286,9 @@ def process():
     print(scrmsg)
     return 0
   ytids = list(set(ytids))
-  confirmed, audioonlycodes_as_list = confirm_cli_args_with_user(ytids, dirpath, videoonlycode, audioonlycodes_as_str)
+  confirmed, audioonlycodes_as_list = confirm_cli_args_with_user(
+    ytids, dirpath, videoonlycode, audioonlycodes_as_str, nvdseq
+  )
   if not confirmed:
     return False
   for ytid in ytids:
@@ -1264,28 +1302,9 @@ def process():
   return True
 
 
-def adhoc_test2():
-  ose = OSEntry(
-    workdir_abspath='.',
-    basefilename='bla [123abcABC-_].mp4',
-    videoonly_or_audio_code=160
-  )
-  print(ose)
-  fn = "REDE GLOBO SE INCOMODA COM VÍDEOS DE IA CONTRA O CONGRESSO NACIONAL [D6anIztaYCE].f160.mp4"
-  fnvalidator = fnval.FilenameValidator(filename=fn)
-  print(fnvalidator)
-
-
-def adhoc_test1():
-  ytid = 'abc+10'
-  scrmsg = f'Testing verify_ytid_validity_or_raise({ytid})'
-  print(scrmsg)
-  ytstrfs.verify_ytid_validity_or_raise(ytid)
-
-
 if __name__ == '__main__':
   """
-  adhoc_test1()
-  adhoc_test2()
+  adhoctest1()
+  adhoctest2()
   """
   process()

@@ -24,7 +24,7 @@ def adhoctest1():
 
 if __name__ == '__main__':
   """
-  adhoc_test2()
+  adhoctest2()
   process()
   """
   adhoctest1()

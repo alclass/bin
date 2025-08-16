@@ -181,7 +181,7 @@ def process():
 
 if __name__ == '__main__':
   """
-  adhoc_test1()
+  adhoctest1()
   process()
   """
   adhoc_test1()
