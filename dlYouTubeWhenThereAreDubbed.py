@@ -2,9 +2,13 @@
 """
 ~/bin/dlYouTubeWhenThereAreDubbed.py
 
-This script uses yt-dlp to download (YouTube) a video in two or more languages if available
-  (YouTube translations in general are autodubbed)
-  (each dubbed/spoken language forms a separate videofile)
+This script uses (underlying) yt-dlp to download (YouTube) a video
+  in two or more languages if available
+  (YouTube spoken-language-translations are, as far as we've noticed, autodubbed)
+
+Each language, dubbed or original, has its own separate audio-only-file
+  that is 'fused' to its video-only counterpart forming the language-dubbed video
+  (@see example below)
 
 Usage:
 ======
@@ -152,8 +156,6 @@ import subprocess
 import sys
 import localuserpylib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
 import localuserpylib.regexfs.filenamevalidator_cls as fnval  # .FilenameValidator
-from wget_urls_in_text_dispatcher import retval
-
 DEFAULT_YTIDS_FILENAME = 'youtube-ids.txt'
 DEFAULT_AUDIOVIDEO_CODE = 602  # previously it was 160, both are 256x144 but 602 has become "more available..."
 DEFAULT_AUDIOVIDEO_DOT_EXT = '.mp4'
@@ -1297,6 +1299,7 @@ def process():
       dlddir_abspath=dirpath,
       videoonlycode=videoonlycode,
       audioonlycodes=audioonlycodes_as_list,
+      nvdseq=nvdseq
     )
     downloader.process()
   return True
