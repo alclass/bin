@@ -979,6 +979,14 @@ class Downloader:
       in queue must be removed.
 
       This method does this emptying of the queue.
+
+    Obs: unfortunalety, the way this method was planned got 'disconnected'
+      from the main process loop which goes through the array of languages sequentially,
+      not looking at the audioonlycodes list.  This may be replanned in the future,
+      i.e., looping directly through the audioonlycodes list or testing its size there,
+      this was not done yet because the call stack got bigger, so we want to do this
+      correction by looking them all. (This problem only affects the download process
+      when the video requested does not have the audioonlycode in passing.)
     """
     while self.n_ongoing_lang < len(self.audioonlycodes) - 1:
       _ = self.audioonlycodes.pop()
@@ -1028,7 +1036,15 @@ class Downloader:
         (the first 'rename' method below sees to it)
     """
     self.rename_bksufixedfilename_to_fsufixedfilename_to_avoid_the_vo_redownload()  # it's done by removing number sufix
-    audiocode = self.audioonlycodes[self.n_ongoing_lang - 1]
+    try:
+      audiocode = self.audioonlycodes[self.n_ongoing_lang - 1]
+    except IndexError:
+      # can't download without audiocode, return
+      scrmsg = (f"audiocode for lang={self.n_ongoing_lang} does not exist at this point,"
+                f" due to a fallback to non-dashed-audiocode (which means only one of them)."
+                f" Returning.")
+      print(scrmsg)
+      return
     compositecode = f"{self.videoonlycode}+{audiocode}"
     pdict = {'compositecode': compositecode, 'videourl': self.videourl}
     comm = self.comm_line_base.format(**pdict)
