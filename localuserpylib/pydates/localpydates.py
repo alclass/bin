@@ -6,6 +6,10 @@ localuserpylib/pydates/localpydates.py
 import datetime
 from typing import Generator
 from xmlrpc.client import boolean
+pt_monthnames = [
+  'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
+]
 
 
 def gen_last_n_monday_dates_from_date(pdate: datetime.date, n=50) -> Generator[datetime.date, None, None]:
@@ -177,6 +181,34 @@ def is_strdate_before_today(strdate: str | None) -> boolean:
   if pdate < today:
     return True
   return False
+
+
+def trans_longtextdate_into_pydate(line):
+  line = line.strip(' \t\r\n')
+  # year happens at the end
+  pp = line.split(' ')
+  # year, day = None, None
+  if len(pp) < 3:
+    return None
+  try:
+    year = int(pp[-1])
+    day = int(pp[0])
+  except ValueError:
+    return None
+  month = None
+  for i, pt_monthname in enumerate(pt_monthnames):
+    if pt_monthname.lower() in line:
+      month = i + 1
+  if month is None:
+    return None
+  try:
+    pdate = datetime.date(year=year, month=month, day=day)
+    return pdate
+  except ValueError:
+    pass
+  return None
+
+
 
 
 def adhoc_test2():
