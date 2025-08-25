@@ -1303,7 +1303,7 @@ def process():
     scrmsg = "No ytid given. Please, enter at least one ytid."
     print(scrmsg)
     return 0
-  ytids = list(set(ytids))
+  ytids = ytstrfs.trans_list_as_uniq_keeping_order_n_mutable(ytids)
   confirmed, audioonlycodes_as_list = confirm_cli_args_with_user(
     ytids, dirpath, videoonlycode, audioonlycodes_as_str, nvdseq
   )

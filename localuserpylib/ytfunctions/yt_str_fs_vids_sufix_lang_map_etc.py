@@ -112,7 +112,7 @@ def read_ytids_from_strlines(strlines: list | None) -> list:
   return ytdis
 
 
-def read_ytids_from_file_n_get_as_list(p_filepath: os.path) -> list:
+def read_ytids_from_file_n_get_as_list(p_filepath: str) -> list:
   """
   Reads text data file and returns its str lines
 
@@ -162,6 +162,39 @@ def get_nsufix_fr_audioonlycode(audioonlycode: str | None) -> int | None:
   except (AttributeError, IndexError):
     pass
   return None
+
+
+def trans_list_as_uniq_keeping_order_n_makingnewlist(ytids):
+  copiedlist = list(ytids)
+  return trans_list_as_uniq_keeping_order_n_mutable(copiedlist)
+
+
+def trans_list_as_uniq_keeping_order_n_mutable(ytids):
+  """
+  Unicizes input list using an element to element comparison
+
+  Obs:
+    The problem with list(set(listvar)), which also unicizes a list, is that
+      it does not maintain the original sequencial ordering
+  """
+  if ytids is None:
+    return None
+  if len(ytids) == 0:
+    return []
+  if len(ytids) == 1:
+    return ytids
+  i = 1
+  while i < len(ytids):
+    # look up backwardly
+    elem_deleted = False
+    for j in range(i-1, -1, -1):
+      if ytids[i] == ytids[j]:
+        del ytids[i]
+        elem_deleted = True
+        break
+    if not elem_deleted:
+      i += 1
+  return ytids
 
 
 class SufixLanguageMapFinder:
@@ -348,6 +381,18 @@ def adhoc_test4():
     print(match.group(1))
   else:
     print("didn't match")
+  testlist = ['d', 'c', 'a', 'b', 'a', 'a', 'c']
+  uniqlist = trans_list_as_uniq_keeping_order_n_makingnewlist(testlist)
+  scrmsg = f"testlist {testlist} | uniqlist {uniqlist}"
+  print(scrmsg)
+  testlist = ['a', 'a']
+  uniqlist = trans_list_as_uniq_keeping_order_n_makingnewlist(testlist)
+  scrmsg = f"testlist {testlist} | uniqlist {uniqlist}"
+  print(scrmsg)
+  testlist = ['a']
+  uniqlist = trans_list_as_uniq_keeping_order_n_makingnewlist(testlist)
+  scrmsg = f"testlist {testlist} | uniqlist {uniqlist}"
+  print(scrmsg)
 
 
 def adhoc_test3():
@@ -433,11 +478,8 @@ def process():
 if __name__ == '__main__':
   """
   process()
-  adhoctest1()
-  adhoctest2()
-  adhoc_test3()
-  """
   adhoc_test1()
   adhoc_test2()
   adhoc_test3()
+  """
   adhoc_test4()
