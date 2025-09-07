@@ -2,7 +2,11 @@
 """
 ~/bin/localuserpylib/regexfs/filenamevalidator_cls.py
 """
+import os.path
 import re
+
+from uTubeRetrieveSubtitles import pass_ytvideoid_thru_probable_filter
+
 ALLOWED_EXTENSIONS = {'mp4', 'mp3', 'mkv', 'webm', 'm4v', 'm4a', 'avi', 'wmv'}
 # NTFS reserved names (case-insensitive)
 RESERVED_NAMES = {
@@ -58,6 +62,27 @@ def get_ytid_if_filename_complies_w_ytid_within_squarebrackets(filename) -> str 
     return None
   ytid = match.group('ytid').lower()
   return ytid
+
+
+def change_fileextension_in_fp_fr_w(filepath_base: str, dot_ext_to_change: str) -> str | None:
+  """
+  Takes a filepath and changes it fileextension returning the changed filepath
+
+  :param filepath_base:
+  :param dot_ext_to_change:
+  :return: recomposed_filepath: str | None
+  """
+  try:
+    folderpath, filename = os.path.split(filepath_base)
+    name, dot_ext = os.path.splitext(filepath_base)
+    # recompose new filename
+    recomposed_filename = f"{name}{dot_ext_to_change}"
+    # recompose new filepath
+    recomposed_filepath = os.path.join(folderpath, recomposed_filename)
+    return recomposed_filepath
+  except ValueError:
+    pass
+  return None
 
 
 class FilenameValidator:
