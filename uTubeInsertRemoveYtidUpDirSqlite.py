@@ -48,7 +48,9 @@ import sys
 from bin_local_settings import PYMIRROAPP_PATH
 appsrootpath = PYMIRROAPP_PATH
 sys.path.insert(1, appsrootpath)
-from commands import uTubeInsertRemoveYtidUpDirSqlite as insertMissingInDb
+# 2025-09-17: package named commands was renamed to cmm
+# noinspection PyUnresolvedReferences
+from cmm import uTubeInsertRemoveYtidUpDirSqlite as insertMissingInDb
 
 
 def dispatch():

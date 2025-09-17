@@ -47,7 +47,8 @@ import sys
 from bin_local_settings import PYMIRROAPP_PATH
 appsrootpath = PYMIRROAPP_PATH
 sys.path.insert(1, appsrootpath)
-from commands import dlYouTubeWithIdsOnTxtFile2 as d2
+# 2025-09-17: package named commands was renamed to cmm
+from cmm import dlYouTubeWithIdsOnTxtFile2 as d2
 
 
 def dispatch():
