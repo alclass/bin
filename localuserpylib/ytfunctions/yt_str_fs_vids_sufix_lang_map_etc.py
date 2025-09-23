@@ -267,6 +267,9 @@ class SufixLanguageMapFinder:
       7: 'po',
       8: 'en',  # on some cases 8 may be English
       9: 'en',  # on most cases 9 may be English
+      10: 'u1',  # unknown1 (the language set may grow to more ones)
+      11: 'u2',  # unknown1
+      9: 'en',  # unknown2
     }
     return self._known_langs_case_ori_en
 

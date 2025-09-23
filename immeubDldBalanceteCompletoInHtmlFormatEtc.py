@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """
+~/bin/immeubDldBalanceteCompletoInHtmlFormatEtc.py
+
 This script (first version 2021-11) issues wget-dowload commands for "immeuble balancetes" within a given month range.
 
 Examples:

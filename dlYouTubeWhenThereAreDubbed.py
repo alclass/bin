@@ -2,15 +2,29 @@
 """
 ~/bin/dlYouTubeWhenThereAreDubbed.py
 
-This script uses (underlying) yt-dlp to download (YouTube) a video
-  in two or more languages if available
-  (YouTube spoken-language-translations are, as far as we've noticed, autodubbed)
+This script uses (underlying) yt-dlp to download (from YouTube) a video
+  in two or more languages.
+
+  YouTube spoken-language-translations are, as far as we've noticed, autodubbed.
+
+Observation about the auto-dubs:
+  1) if the video has only its original language available,
+    this script is able to "fall back" to a one-language download;
+  2) the fall-back is not "perfectly" perceived,
+    at the time of writing any non-zero return from subprocess
+    will make this script try a one-language download, but,
+    if that was caused by, say, a network fault, and the video is
+    multilanguage, the one-language will also fail.
 
 Each language, dubbed or original, has its own separate audio-only-file
-  that is 'fused' to its video-only counterpart forming the language-dubbed video
+  that is 'fused' (merged) to its video-only counterpart
+  forming the language-dubbed video
   (@see example below)
 
-Usage:
+Usage (this is about to receive some adjustments):
+  (the --audioonlycodes will become --audiomainnumber)
+  (the --map will be introduced)
+  (a sketch of this upgrade comes at the end)
 ======
   $dlYouTubeWhenThereAreDubbed.py [--ytid <ytid or yturl within "">]
     [--useinputfile]
@@ -148,6 +162,24 @@ Limitation: what does this script not do (at least yet)?
       the program will halt showing its error message,
     (ie, this script does not yet treat non-0 return cases [*] in a better way)
     [*] imagining mostly that non-O returns are network problems or yt-dlp upgrade needs
+
+On 2025-08-01:
+  the main parts of this script were already in use
+On 2025-09-23:
+  thinking about an innovation to this script
+  introducing the --map CLI parameter
+  --map accepts a string like a dict without spaces, e.g.:
+    => --map "0:en,1:pt"
+  This informs the number sufixes for the audioonlycode and which languages those represent
+  Because of that, parameter --audioonlycodes may also be changed:
+    FROM: a list of "dashed" number (e.g. "[249-0, 249-1"])
+    TO: a number  (e.g. "249")
+  --audioonlycodes may become --audiomainnumber
+
+Justification:
+  the number of YouTube autodubbed available languages
+    not only may vary from video to video (especially in English originals),
+    but it may also grow in the future
 """
 import argparse
 import os.path
@@ -161,6 +193,9 @@ OSEntry = ose.OSEntry
 DEFAULT_YTIDS_FILENAME = ose.DEFAULT_YTIDS_FILENAME
 DEFAULT_AUDIOVIDEO_CODE = ose.DEFAULT_AUDIOVIDEO_CODE
 DEFAULT_AUDIOVIDEO_DOT_EXT = ose.DEFAULT_AUDIOVIDEO_DOT_EXT
+DEFAULT_AUDIO_ONLY_CODES = ose.DEFAULT_AUDIO_ONLY_CODES
+DEFAULT_SFX_W_2LETLNG_MAPDCT = ose.DEFAULT_SFX_W_2LETLNG_MAPDCT
+DEFAULT_VIDEO_ONLY_CODE = ose.DEFAULT_VIDEO_ONLY_CODE
 VIDEO_DOT_EXTENSIONS = ose.VIDEO_DOT_EXTENSIONS
 default_videodld_tmpdir = ose.default_videodld_tmpdir
 # Parse command-line arguments
@@ -179,6 +214,8 @@ parser.add_argument("--audioonlycodes", type=str, default="233-0,233-1",
                     help="audio only codes: example: 233-0,233-1")
 parser.add_argument("--nvdseq", type=int, default=1,
                     help="the sequencial number that accompanies the 'vd' namemarker at the last renaming")
+parser.add_argument("--map", type=str, default="0:en,1:pt",
+                    help="the dictionary-mapping with numbers and the 2-letter language codes (e.g. '0:en,1:pt')")
 args = parser.parse_args()
 
 
@@ -190,8 +227,9 @@ def show_docstrhelp_n_exit():
 class Downloader:
 
   # class-wide static constants
-  DEFAULT_VIDEO_ONLY_CODE = 160
-  DEFAULT_AUDIO_ONLY_CODES = ['233-0', '233-1']
+  DEFAULT_VIDEO_ONLY_CODE = DEFAULT_VIDEO_ONLY_CODE
+  DEFAULT_AUDIO_ONLY_CODES = DEFAULT_AUDIO_ONLY_CODES
+  DEFAULT_SFX_W_2LETLNG_MAPDCT = DEFAULT_SFX_W_2LETLNG_MAPDCT
   videodld_tmpdirname = default_videodld_tmpdir
   # class-wide static interpolable-string constants
   comm_line_base = 'yt-dlp -w -f {compositecode} "{videourl}"'
@@ -203,13 +241,15 @@ class Downloader:
       dlddir_abspath: str = None,
       videoonlycode: int = None,
       audioonlycodes: list = None,
-      nvdseq: int = None
+      nvdseq: int = None,
+      sfx_n_2letlng_dict: dict = None,
     ):
     self.ytid = ytid
     self.nvdseq = nvdseq or 1
     self.dlddir_abspath = dlddir_abspath
     self.videoonlycode = videoonlycode
     self.audioonlycodes = audioonlycodes  # example: ['233-0', '233-1']
+    self.sfx_n_2letlng_dict = sfx_n_2letlng_dict
     self.treat_input()
     self.ytsufixlang_o = ytstrfs.SufixLanguageMapFinder(self.audioonlycodes)
     self.b_verified_once_tmpdir_abspath = None
@@ -238,6 +278,19 @@ class Downloader:
       # this default for the audiocodes generally works when English is autodubbed and another language is the original
       # notice that this script, at the time of writing, does not know about which language is which (@see docstr above)
       self.audioonlycodes = self.DEFAULT_AUDIO_ONLY_CODES
+    if self.sfx_n_2letlng_dict is None:
+      return
+    for number in self.sfx_n_2letlng_dict:
+      twolettercode = self.sfx_n_2letlng_dict[number]
+      if len(twolettercode) != 2:
+        errmsg = f"The 2-letter-language-code [{twolettercode}] should have only 2 letter."
+        raise ValueError(errmsg)
+    sz_2letter_map = len(self.sfx_n_2letlng_dict)
+    sz_audiocodes = len(self.audioonlycodes)
+    if sz_2letter_map != sz_audiocodes:
+      errmsg = (f"Number of elements in sz_2letter_map (={sz_2letter_map})"
+                f" is different than that of audiocodes (={sz_audiocodes})")
+      raise ValueError(errmsg)
 
   @property
   def n_langs(self):
