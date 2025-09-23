@@ -197,6 +197,88 @@ def trans_list_as_uniq_keeping_order_n_mutable(ytids):
   return ytids
 
 
+def trans_str_sfx_n_2letlng_map_to_dict_or_raise(pdict):
+  """
+  This function is called for help instance SufixLangMapper
+  and also from "outside" script dlYouTubeWhenThereAreDubbed
+  """
+  outdict = {}
+  pp = pdict.split(',')
+  for elem in pp:
+    try:
+      pair = elem.split(':')
+      number = int(pair[0])
+      twolettercode = pair[1]
+      outdict.update({number: twolettercode})
+      if len(twolettercode) != 2:
+        errmsg = f"Error: a twolettercode should have 2 letter, it has {len(twolettercode)} in {pdict}"
+        raise ValueError(errmsg)
+    except (IndexError, ValueError) as e:
+      errmsg = f"Error: sfx_n_2letlng_dict is malformed {pdict} | {e}"
+      raise ValueError(errmsg)
+  return outdict
+
+
+class SufixLanguageMapper:
+
+  def __init__(self, pdict: dict | str, audiomainnumber=249):
+    self.indict = pdict
+    self.at_number = 0
+    self.reached_end = False
+    self.twolettercodes_given = []
+    self.audiomainnumber = audiomainnumber
+    self.treat_indict()
+    self.init_twolettercodes_given()
+
+  def treat_indict(self):
+    if self.indict is None:
+      errmsg = f"Error: the sufix and language dict {self.indict} is malformed or None"
+      raise ValueError(errmsg)
+    if isinstance(self.indict, str):
+      self.indict = trans_str_sfx_n_2letlng_map_to_dict_or_raise(self.indict)
+
+  def init_twolettercodes_given(self):
+    for n in self.indict:
+      self.twolettercodes_given.append(n)
+    self.twolettercodes_given.sort()
+    self.twolettercodes_given.reverse()  # because pop() will used ahead
+
+  def get_twolettercode_for_sufix_n(self, idx):
+    try:
+      twolettercode = self.indict[idx]
+      return twolettercode
+    except KeyError:
+      pass
+    return None
+
+  def next(self) -> str | None:
+    if len(self.twolettercodes_given) == 0:
+      return None
+    idx = self.twolettercodes_given.pop()
+    twolettercode = self.get_twolettercode_for_sufix_n(idx)
+    if twolettercode is None:
+      return None
+    return twolettercode
+
+  def traverse_sufix_n_twolettercode(self):
+    """
+    Traverses (loops over with yield [a generator]) the items in self.indict
+    This method is "disconnected" with next(), beucase:
+      1 - next() consumed a list that is initiated from self.indict
+      2 - this method, on the contrary, loops over original self.indict
+    """
+    items = self.indict.items()
+    items = sorted(items, key=lambda i: i[0])
+    for item in items:
+      yield item
+
+  def __str__(self):
+    outstr = f"""
+    {self.indict}
+    """
+    return outstr
+
+
 class SufixLanguageMapFinder:
   """
   This class finds a map (dict) of sufixes to languages
@@ -269,7 +351,7 @@ class SufixLanguageMapFinder:
       9: 'en',  # on most cases 9 may be English
       10: 'u1',  # unknown1 (the language set may grow to more ones)
       11: 'u2',  # unknown1
-      9: 'en',  # unknown2
+      12: 'en',  # unknown2
     }
     return self._known_langs_case_ori_en
 
@@ -374,7 +456,15 @@ class SufixLanguageMapFinder:
     return outstr
 
 
-def adhoc_test4():
+def adhoctest5():
+  strdict = '1:pt,0:en'
+  langmapper = SufixLanguageMapper(strdict)
+  print(langmapper)
+  for item in langmapper.traverse_sufix_n_twolettercode():
+    print(item)
+
+
+def adhoctest4():
   print('-'*30)
   print('adhoc_test4: cmpld_ytid_instr_af_equalsign_pattern')
   t = 'https://www.youtube.com/watch?v=Gjg471uIL9k&pp=wgIGCgQQAhgD'
@@ -398,7 +488,7 @@ def adhoc_test4():
   print(scrmsg)
 
 
-def adhoc_test3():
+def adhoctest3():
   print('-'*30)
   print('adhoc_test3: extract_ytid_from_yturl_or_itself_or_none')
   t = 'https://www.youtube.com/watch?v=Gjg471uIL9k&pp=wgIGCgQQAhgD'
@@ -414,7 +504,7 @@ def adhoc_test3():
   # return ytid
 
 
-def adhoc_test2():
+def adhoctest2():
   """
   https://www.youtube.com/watch?v=GnFNf7Q7tH4
   https://www.youtube.com/watch?v=_8iL9SdyJng
@@ -434,7 +524,7 @@ def adhoc_test2():
   print('result', result)
 
 
-def adhoc_test1():
+def adhoctest1():
   """
   """
   print('-'*30)
@@ -485,4 +575,4 @@ if __name__ == '__main__':
   adhoc_test2()
   adhoc_test3()
   """
-  adhoc_test4()
+  adhoctest5()

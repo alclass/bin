@@ -15,6 +15,7 @@ DEFAULT_YTIDS_FILENAME = 'youtube-ids.txt'
 DEFAULT_AUDIOVIDEO_CODE = 602  # previously it was 160, both are 256x144 but 602 has become "more available..."
 DEFAULT_AUDIOVIDEO_DOT_EXT = '.mp4'
 DEFAULT_AUDIO_ONLY_CODES = ['233-0', '233-1']
+DEFAULT_AUDIO_MAIN_NUMBER = 249
 DEFAULT_VIDEO_ONLY_CODE = 160
 DEFAULT_SFX_W_2LETLNG_MAPDCT = {0: 'en', 1: 'pt'}  # en is English, pt is Portuguese
 VIDEO_DOT_EXTENSIONS = ['.mp4', '.mkv', '.webm', '.m4v', '.avi', '.wmv']

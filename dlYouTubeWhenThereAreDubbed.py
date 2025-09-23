@@ -7,25 +7,42 @@ This script uses (underlying) yt-dlp to download (from YouTube) a video
 
   YouTube spoken-language-translations are, as far as we've noticed, autodubbed.
 
-Observation about the auto-dubs:
-  1) if the video has only its original language available,
+Observation about the auto-dubs and this script:
+
+  1) if the video has only its original language available, no auto-dubs,
     this script is able to "fall back" to a one-language download;
+
   2) the fall-back is not "perfectly" perceived,
     at the time of writing any non-zero return from subprocess
-    will make this script try a one-language download, but,
-    if that was caused by, say, a network fault, and the video is
-    multilanguage, the one-language will also fail.
+    will make this script try a one-language download,
+
+  3) but, if the non-zero return was caused by, say,
+    a network fault, and the video is in fact multilanguage,
+    the one-language attempt will also fail
+    (attempting to download a multilanguage video with
+     a one-language audiocode returns an error from YouTube).
 
 Each language, dubbed or original, has its own separate audio-only-file
-  that is 'fused' (merged) to its video-only counterpart
+  that is 'fused' (or merged) to its video-only counterpart
   forming the language-dubbed video
   (@see example below)
 
 Usage (this is about to receive some adjustments):
-  (the --audioonlycodes will become --audiomainnumber)
+  (the --audioonlycodes will become --amn (for "audiomainnumber"))
   (the --map will be introduced)
+  (the --videoonlycode will become --voc)
   (a sketch of this upgrade comes at the end)
 ======
+
+Proposed (newer) syntax:
+  $dlYouTubeWhenThereAreDubbed.py [--ytid <ytid or yturl within "">]
+    [--useinputfile]
+    [--voc <video-only-code-number>]
+    [--amn <audio-main-number>]
+    [--map <dictionary-map-informing-sufixes-and-their-2-letter-language-codes>]
+
+
+Older syntax:
   $dlYouTubeWhenThereAreDubbed.py [--ytid <ytid or yturl within "">]
     [--useinputfile]
     [--videoonlycode <video-format-number>]
@@ -194,6 +211,7 @@ DEFAULT_YTIDS_FILENAME = ose.DEFAULT_YTIDS_FILENAME
 DEFAULT_AUDIOVIDEO_CODE = ose.DEFAULT_AUDIOVIDEO_CODE
 DEFAULT_AUDIOVIDEO_DOT_EXT = ose.DEFAULT_AUDIOVIDEO_DOT_EXT
 DEFAULT_AUDIO_ONLY_CODES = ose.DEFAULT_AUDIO_ONLY_CODES
+DEFAULT_AUDIO_MAIN_NUMBER = ose.DEFAULT_AUDIO_MAIN_NUMBER
 DEFAULT_SFX_W_2LETLNG_MAPDCT = ose.DEFAULT_SFX_W_2LETLNG_MAPDCT
 DEFAULT_VIDEO_ONLY_CODE = ose.DEFAULT_VIDEO_ONLY_CODE
 VIDEO_DOT_EXTENSIONS = ose.VIDEO_DOT_EXTENSIONS
@@ -208,9 +226,9 @@ parser.add_argument("--useinputfile", action='store_true',
                     help="read the default ytids input file")
 parser.add_argument("--dirpath", type=str,
                     help="Directory recipient of the download")
-parser.add_argument("--videoonlycode", type=str, default=f"{DEFAULT_AUDIOVIDEO_CODE}",
+parser.add_argument("--voc", type=int, default=f"{DEFAULT_AUDIOVIDEO_CODE}",
                     help="video only code: example: 160")
-parser.add_argument("--audioonlycodes", type=str, default="233-0,233-1",
+parser.add_argument("--amn", type=int, default="249",
                     help="audio only codes: example: 233-0,233-1")
 parser.add_argument("--nvdseq", type=int, default=1,
                     help="the sequencial number that accompanies the 'vd' namemarker at the last renaming")
@@ -1029,29 +1047,22 @@ def get_cli_args():
   # default to the current working directory if none is given
   dirpath = args.dirpath or os.path.abspath(".")
   videoonlycode = args.videoonlycode or None
-  audioonlycodes = args.audioonlycodes or []
+  audiomainnumber = args.amn or DEFAULT_AUDIO_MAIN_NUMBER
+  sfx_n_2letlng_dict = args.map or DEFAULT_SFX_W_2LETLNG_MAPDCT
   nvdseq = args.nvdseq or 1
-  return ytid, boo_readfile, dirpath, videoonlycode, audioonlycodes, nvdseq
+  return ytid, boo_readfile, dirpath, videoonlycode, audiomainnumber, nvdseq, sfx_n_2letlng_dict
 
 
-def confirm_cli_args_with_user(ytids, dirpath, videoonlycode, audioonlycodes, nvdseq):
+def verify_n_trans_sfx_n_2letlng_dict(sfx_n_2letlng_dict):
+  return ytstrfs.trans_str_sfx_n_2letlng_map_to_dict_or_raise(sfx_n_2letlng_dict)
+
+
+def confirm_cli_args_with_user(ytids, dirpath, videoonlycode, audiomainnumber, nvdseq, sfx_n_2letlng_dict):
   if not os.path.isdir(dirpath):
     scrmsg = f"Source directory [{dirpath}] does not exist. Please, retry."
     print(scrmsg)
     return False
-  try:
-    int(videoonlycode)
-  except ValueError:
-    scrmsg = f"videoonlycode [{videoonlycode}] should be a number. Please, retry"
-    print(scrmsg)
-    return False
-  try:
-    audioonlycodes = audioonlycodes.split(',')
-  except ValueError:
-    scrmsg = (f"audioonlycodes [{audioonlycodes}] should be a number list with possible sufixes."
-              f" (@see also docstr for more info). Please, retry.")
-    print(scrmsg)
-    return False
+  sfx_n_2letlng_dict = verify_n_trans_sfx_n_2letlng_dict(sfx_n_2letlng_dict)
   charrule = '=' * 20
   print(charrule)
   print('Input parameters entered')
@@ -1062,7 +1073,8 @@ def confirm_cli_args_with_user(ytids, dirpath, videoonlycode, audioonlycodes, nv
   => dirpath = [{dirpath}]
   (confer default subdirectory "{default_videodld_tmpdir}" or other)
   -------------------
-  => videoonlycode = {videoonlycode} | audioonlycodes = {audioonlycodes} 
+  => videoonlycode = {videoonlycode} | audiomainnumber = {audiomainnumber}
+  => sfx_n_2letlng_dict = {sfx_n_2letlng_dict}
   """
   print(scrmsg)
   print(charrule)
@@ -1072,7 +1084,7 @@ def confirm_cli_args_with_user(ytids, dirpath, videoonlycode, audioonlycodes, nv
   confirmed = False
   if ans in ['Y', 'y', '']:
     confirmed = True
-  return confirmed, audioonlycodes
+  return confirmed, sfx_n_2letlng_dict
 
 
 def get_default_ytids_filepath(p_dirpath):
@@ -1094,7 +1106,7 @@ def adhoctest1():
 def process():
   """
   """
-  ytid, b_useinputfile, dirpath, videoonlycode, audioonlycodes_as_str, nvdseq = get_cli_args()
+  ytid, b_useinputfile, dirpath, videoonlycode, audiomainnumber, nvdseq, sfx_n_2letlng_dict = get_cli_args()
   ytid = ytstrfs.extract_ytid_from_yturl_or_itself_or_none(ytid)
   ytids = []
   if b_useinputfile:
@@ -1110,7 +1122,9 @@ def process():
     return 0
   ytids = ytstrfs.trans_list_as_uniq_keeping_order_n_mutable(ytids)
   confirmed, audioonlycodes_as_list = confirm_cli_args_with_user(
-    ytids, dirpath, videoonlycode, audioonlycodes_as_str, nvdseq
+    ytids, dirpath, videoonlycode,
+    audiomainnumber, nvdseq,
+    sfx_n_2letlng_dict
   )
   if not confirmed:
     return False
@@ -1120,7 +1134,8 @@ def process():
       dlddir_abspath=dirpath,
       videoonlycode=videoonlycode,
       audioonlycodes=audioonlycodes_as_list,
-      nvdseq=nvdseq
+      nvdseq=nvdseq,
+      sfx_n_2letlng_dict=sfx_n_2letlng_dict
     )
     _ = downloader.process()  # process() returns a boolean (True | False)
   return True
