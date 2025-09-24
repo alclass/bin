@@ -248,6 +248,7 @@ class Downloader:
   DEFAULT_VIDEO_ONLY_CODE = DEFAULT_VIDEO_ONLY_CODE
   DEFAULT_AUDIO_ONLY_CODES = DEFAULT_AUDIO_ONLY_CODES
   DEFAULT_SFX_W_2LETLNG_MAPDCT = DEFAULT_SFX_W_2LETLNG_MAPDCT
+  DEFAULT_AUDIO_MAIN_NUMBER = DEFAULT_AUDIO_MAIN_NUMBER
   videodld_tmpdirname = default_videodld_tmpdir
   # class-wide static interpolable-string constants
   comm_line_base = 'yt-dlp -w -f {compositecode} "{videourl}"'
@@ -258,7 +259,7 @@ class Downloader:
       ytid: str,
       dlddir_abspath: str = None,
       videoonlycode: int = None,
-      audioonlycodes: list = None,
+      audiomainnumber: int = None,
       nvdseq: int = None,
       sfx_n_2letlng_dict: dict = None,
     ):
@@ -266,10 +267,10 @@ class Downloader:
     self.nvdseq = nvdseq or 1
     self.dlddir_abspath = dlddir_abspath
     self.videoonlycode = videoonlycode
-    self.audioonlycodes = audioonlycodes  # example: ['233-0', '233-1']
+    self.audiomainnumber = audiomainnumber  # example: 233, 234, 249 etc
     self.sfx_n_2letlng_dict = sfx_n_2letlng_dict
     self.treat_input()
-    self.ytsufixlang_o = ytstrfs.SufixLanguageMapFinder(self.audioonlycodes)
+    self.ytsufixlang_o = ytstrfs.SufixLanguageMapFinder(self.sfx_n_2letlng_dict)
     self.b_verified_once_tmpdir_abspath = None
     self.prename = None
     self.previously_existing_filenames_in_tmpdir = []
@@ -292,10 +293,10 @@ class Downloader:
     if self.videoonlycode is None:
       # this is the default for the videocode
       self.videoonlycode = self.DEFAULT_VIDEO_ONLY_CODE
-    if self.audioonlycodes is None or len(self.audioonlycodes) == 0:
+    if self.audiomainnumber is None or not isinstance(self.audiomainnumber, int):
       # this default for the audiocodes generally works when English is autodubbed and another language is the original
       # notice that this script, at the time of writing, does not know about which language is which (@see docstr above)
-      self.audioonlycodes = self.DEFAULT_AUDIO_ONLY_CODES
+      self.audiomainnumber = self.DEFAULT_AUDIO_MAIN_NUMBER
     if self.sfx_n_2letlng_dict is None:
       return
     for number in self.sfx_n_2letlng_dict:
@@ -303,18 +304,10 @@ class Downloader:
       if len(twolettercode) != 2:
         errmsg = f"The 2-letter-language-code [{twolettercode}] should have only 2 letter."
         raise ValueError(errmsg)
-    sz_2letter_map = len(self.sfx_n_2letlng_dict)
-    sz_audiocodes = len(self.audioonlycodes)
-    if sz_2letter_map != sz_audiocodes:
-      errmsg = (f"Number of elements in sz_2letter_map (={sz_2letter_map})"
-                f" is different than that of audiocodes (={sz_audiocodes})")
-      raise ValueError(errmsg)
 
   @property
   def n_langs(self):
-    if self.audioonlycodes is None:
-      return 0
-    return len(self.audioonlycodes)
+    return len(self.sfx_n_2letlng_dict)
 
   @property
   def videourl(self):
@@ -336,7 +329,7 @@ class Downloader:
     """
     srcfilepath = self.osentry.fp_for_fn_as_name_fsufix_ext
     srcfilename = self.osentry.fn_as_name_fsufix_ext
-    audiocode = self.audioonlycodes[0]  # index 0 is the first language
+    audiocode = self.lang_map.get_first_2lettlangcode()  # index 0 is the first language
     trgfilepath = self.osentry.get_fp_for_fn_as_name_fsufix_ext_bksufix(1)
     trgfilename = self.osentry.get_fn_as_name_fsufix_ext_bksufix(1)
     if not os.path.isfile(srcfilepath):
@@ -1103,9 +1096,7 @@ def adhoctest1():
   ytstrfs.verify_ytid_validity_or_raise(ytid)
 
 
-def process():
-  """
-  """
+def get_cli_params_n_confirm():
   ytid, b_useinputfile, dirpath, videoonlycode, audiomainnumber, nvdseq, sfx_n_2letlng_dict = get_cli_args()
   ytid = ytstrfs.extract_ytid_from_yturl_or_itself_or_none(ytid)
   ytids = []
@@ -1119,7 +1110,7 @@ def process():
   if len(ytids) == 0:
     scrmsg = "No ytid given. Please, enter at least one ytid."
     print(scrmsg)
-    return 0
+    return []
   ytids = ytstrfs.trans_list_as_uniq_keeping_order_n_mutable(ytids)
   confirmed, audioonlycodes_as_list = confirm_cli_args_with_user(
     ytids, dirpath, videoonlycode,
@@ -1127,13 +1118,32 @@ def process():
     sfx_n_2letlng_dict
   )
   if not confirmed:
+    return None
+  params_packed = (
+    ytids, dirpath, videoonlycode,
+    audiomainnumber, nvdseq,
+    sfx_n_2letlng_dict
+  )
+  return params_packed
+
+
+def process():
+  """
+  """
+  params_packed = get_cli_params_n_confirm()
+  (
+   ytids, dirpath,
+   videoonlycode, audiomainnumber,
+   nvdseq, sfx_n_2letlng_dict
+  ) = params_packed
+  if ytids is None or len(ytids) == 0:
     return False
   for ytid in ytids:
     downloader = Downloader(
       ytid=ytid,
       dlddir_abspath=dirpath,
       videoonlycode=videoonlycode,
-      audioonlycodes=audioonlycodes_as_list,
+      audiomainnumber=audiomainnumber,
       nvdseq=nvdseq,
       sfx_n_2letlng_dict=sfx_n_2letlng_dict
     )
