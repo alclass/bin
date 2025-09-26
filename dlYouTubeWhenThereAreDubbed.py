@@ -36,6 +36,8 @@ Usage (this is about to receive some adjustments):
 
 Proposed (newer) syntax:
   $dlYouTubeWhenThereAreDubbed.py [--ytid <ytid or yturl within "">]
+    [--dirpath "<dirpath>"]
+    [--dirpath]
     [--useinputfile]
     [--voc <video-only-code-number>]
     [--amn <audio-main-number>]
@@ -44,6 +46,7 @@ Proposed (newer) syntax:
 
 Older syntax:
   $dlYouTubeWhenThereAreDubbed.py [--ytid <ytid or yturl within "">]
+    [--dirpath "<dirpath>"]
     [--useinputfile]
     [--videoonlycode <video-format-number>]
     --audioonlycodes <list of audio-format-codes>
@@ -57,6 +60,8 @@ Where:
   <video-format-number> => an integer representing the video-only-format
     default: this parameter defaults to 160 (a video-only-code having 256x144 resolution)
   <list of audio-format-codes> => a list of all audio-only-codes desired for the yt-dlp downloads
+  <dirpath> is the absolute directory path from where the default download subdirectory resides
+    obs: the download directory is a prenamed subdirectory inside <dirpath>
 
 Example:
 ========
@@ -198,7 +203,7 @@ Justification:
     not only may vary from video to video (especially in English originals),
     but it may also grow in the future
 """
-import argparse
+# import argparse
 import os.path
 import shutil
 import subprocess
@@ -206,35 +211,16 @@ import sys
 import localuserpylib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
 import localuserpylib.regexfs.filenamevalidator_cls as fnval  # .FilenameValidator
 import localuserpylib.ytfunctions.osentry_class as ose  # ose.OSEntry
+import localuserpylib.ytfunctions.cliparams_for_utubewhendub as clip  # clip.CliParam
 OSEntry = ose.OSEntry
 DEFAULT_YTIDS_FILENAME = ose.DEFAULT_YTIDS_FILENAME
 DEFAULT_AUDIOVIDEO_CODE = ose.DEFAULT_AUDIOVIDEO_CODE
 DEFAULT_AUDIOVIDEO_DOT_EXT = ose.DEFAULT_AUDIOVIDEO_DOT_EXT
-DEFAULT_AUDIO_ONLY_CODES = ose.DEFAULT_AUDIO_ONLY_CODES
 DEFAULT_AUDIO_MAIN_NUMBER = ose.DEFAULT_AUDIO_MAIN_NUMBER
 DEFAULT_SFX_W_2LETLNG_MAPDCT = ose.DEFAULT_SFX_W_2LETLNG_MAPDCT
 DEFAULT_VIDEO_ONLY_CODE = ose.DEFAULT_VIDEO_ONLY_CODE
 VIDEO_DOT_EXTENSIONS = ose.VIDEO_DOT_EXTENSIONS
 default_videodld_tmpdir = ose.default_videodld_tmpdir
-# Parse command-line arguments
-parser = argparse.ArgumentParser(description="Compress videos to a specified resolution.")
-parser.add_argument("--docstr", action="store_true",
-                    help="show docstr help and exit")
-parser.add_argument("--ytid", type=str,
-                    help="the video id")
-parser.add_argument("--useinputfile", action='store_true',
-                    help="read the default ytids input file")
-parser.add_argument("--dirpath", type=str,
-                    help="Directory recipient of the download")
-parser.add_argument("--voc", type=int, default=f"{DEFAULT_AUDIOVIDEO_CODE}",
-                    help="video only code: example: 160")
-parser.add_argument("--amn", type=int, default="249",
-                    help="audio only codes: example: 233-0,233-1")
-parser.add_argument("--nvdseq", type=int, default=1,
-                    help="the sequencial number that accompanies the 'vd' namemarker at the last renaming")
-parser.add_argument("--map", type=str, default="0:en,1:pt",
-                    help="the dictionary-mapping with numbers and the 2-letter language codes (e.g. '0:en,1:pt')")
-args = parser.parse_args()
 
 
 def show_docstrhelp_n_exit():
@@ -246,7 +232,6 @@ class Downloader:
 
   # class-wide static constants
   DEFAULT_VIDEO_ONLY_CODE = DEFAULT_VIDEO_ONLY_CODE
-  DEFAULT_AUDIO_ONLY_CODES = DEFAULT_AUDIO_ONLY_CODES
   DEFAULT_SFX_W_2LETLNG_MAPDCT = DEFAULT_SFX_W_2LETLNG_MAPDCT
   DEFAULT_AUDIO_MAIN_NUMBER = DEFAULT_AUDIO_MAIN_NUMBER
   videodld_tmpdirname = default_videodld_tmpdir
@@ -275,7 +260,8 @@ class Downloader:
     self.prename = None
     self.previously_existing_filenames_in_tmpdir = []
     self.n_ongoing_lang = 0
-    self.lang_map = {}  # this dict has {sufix: 2-letter-langid}
+    # this object gives audiocode variables such as audiocodemain and audiocodesufix
+    self.langmapper = ytstrfs.SufixLanguageMapper(self.sfx_n_2letlng_dict, self.audiomainnumber)
     self.osentry = OSEntry(
       workdir_abspath=self.child_tmpdir_abspath,
       basefilename=None,  # later to be known
@@ -329,7 +315,7 @@ class Downloader:
     """
     srcfilepath = self.osentry.fp_for_fn_as_name_fsufix_ext
     srcfilename = self.osentry.fn_as_name_fsufix_ext
-    audiocode = self.lang_map.get_first_2lettlangcode()  # index 0 is the first language
+    audiocode = self.langmapper.get_first_2lettlangcode()  # index 0 is the first language
     trgfilepath = self.osentry.get_fp_for_fn_as_name_fsufix_ext_bksufix(1)
     trgfilename = self.osentry.get_fn_as_name_fsufix_ext_bksufix(1)
     if not os.path.isfile(srcfilepath):
@@ -386,7 +372,7 @@ class Downloader:
       sys.exit(1)
     for i in range(1, self.n_langs):
       lang_seq = i + 1
-      audiocode = self.audioonlycodes[i]
+      audiocode = self.langmapper.get_twolettercode_for_sufix_n(i)
       trgfilepath = self.osentry.get_fp_for_fn_as_name_fsufix_ext_bksufix(lang_seq)
       trgfilename = self.osentry.get_fn_as_name_fsufix_ext_bksufix(lang_seq)
       scrmsg = f"""[copying bk1 to the bk{lang_seq} audiocode={audiocode}]
@@ -770,7 +756,7 @@ class Downloader:
       print(errmsg)
       sys.exit(1)
 
-  def delete_all_lang_subcodes_afterfallback(self):
+  def set_langmapper_to_no_dubs(self):
     """
     Deletes all audioonlycodes after ongoing_index in queue (list)
 
@@ -795,9 +781,10 @@ class Downloader:
       this was not done yet because the call stack got bigger, so we want to do this
       correction by looking them all. (This problem only affects the download process
       when the video requested does not have the audioonlycode in passing.)
-    """
-    while self.n_ongoing_lang < len(self.audioonlycodes) - 1:
+    while self.n_ongoing_lang < self.langmapper.size - 1:
       _ = self.audioonlycodes.pop()
+    """
+    self.langmapper.turn_off_dubs()
 
   def fallback_to_nondashed_audiocode_changing_it(self):
     """
@@ -816,23 +803,9 @@ class Downloader:
           and form the video in its original language.
         That would complete the job supposing the video does not have another translated language anyway.
     """
-    try:
-      # position to new logical next self.n_ongoing_lang
-      # if it was already the last, the exception (IndexError) will handle it
-      audiocodestr = self.audioonlycodes[self.n_ongoing_lang]
-      pp = audiocodestr.split('-')
-      newaudiocode = pp[0]
-      # this list-index below is the next in the loop it's returning to
-      self.audioonlycodes[self.n_ongoing_lang] = newaudiocode
-      # let's also delete anything further on this index-point
-      # (the reason is that translations do not exist without dash-numbers)
-      self.delete_all_lang_subcodes_afterfallback()
-    except IndexError:
-      scrmsg = f"""WARNING: 
-      could not derive a non-dashed-sufix.
-        => audioonlycodes = {self.audioonlycodes}
-      Returning."""
-      print(scrmsg)
+    self.set_langmapper_to_no_dubs()
+    scrmsg = "Set language mapper to 'no dubs'"
+    print(scrmsg)
 
   def download_audiopart_to_blend_it_w_videoonly(self):
     """
@@ -844,20 +817,13 @@ class Downloader:
         (the first 'rename' method below sees to it)
     """
     self.rename_bksufixedfilename_to_fsufixedfilename_to_avoid_the_vo_redownload()  # it's done by removing number sufix
-    try:
-      audiocode = self.audioonlycodes[self.n_ongoing_lang - 1]
-    except IndexError:
-      # can't download without audiocode, return
-      scrmsg = (f"audiocode for lang={self.n_ongoing_lang} does not exist at this point,"
-                f" due to a fallback to non-dashed-audiocode (which means only one of them)."
-                f" Returning.")
-      print(scrmsg)
-      return
-    compositecode = f"{self.videoonlycode}+{audiocode}"
+    compositecode = self.langmapper.get_audioonlycode_for_1baseidx(self.n_ongoing_lang)
+    scrmsg = f"audio compositecode now is {compositecode}"
+    print(scrmsg)
     pdict = {'compositecode': compositecode, 'videourl': self.videourl}
     comm = self.comm_line_base.format(**pdict)
     try:
-      scrmsg = f"audiocode={audiocode} | running: {comm}"
+      scrmsg = f"audioonlycode={compositecode} | running: {comm}"
       print(scrmsg)
       """
       scrmsg = f"Continue with the download above (Y/n)? [ENTER] means Yes"
@@ -891,15 +857,9 @@ class Downloader:
     """
     srccanofilepath = self.osentry.fp_for_fn_as_name_ext
     srccanofilename = self.osentry.fp_for_fn_as_name_ext
-    try:
-      # this may happen if a fallback to non_dashed_audioonlycode happened previously
-      # but maybe this one is not the best solution (to think about)
-      audioonlycode = self.audioonlycodes[self.n_ongoing_lang-1]
-    except IndexError:
-      return
-    langprefix = self.get_lang2lettercode_fr_audioonlycode(audioonlycode)
+    lang2lettcode = self.langmapper.get_ith_2lettlangcode_1idxbased(self.n_ongoing_lang)
     # "vd1" stands for "video 1", an idea is to make it possible for an increment (ex video 2, 3...) if needed
-    langprefix = f"vd{self.nvdseq}-{langprefix}"
+    langprefix = f"vd{self.nvdseq}-{lang2lettcode}"
     langprefixedfilename = f"{langprefix} {self.osentry.fn_as_name_ext}"
     langprefixedfilepath = os.path.join(self.osentry.workdir_abspath, langprefixedfilename)
     if not os.path.isfile(srccanofilepath):
@@ -933,6 +893,7 @@ class Downloader:
       return
     try:
       os.rename(srccanofilepath, langprefixedfilepath)
+      audioonlycode = self.langmapper.get_audioonlycode_for_1baseidx(self.n_ongoing_lang)
       scrmsg = f"""Rename succeeded => lang={self.n_ongoing_lang} | audiocode={audioonlycode}
       ------------------------------------
       FROM (canonical)  : [{srccanofilename}]
@@ -965,6 +926,7 @@ class Downloader:
   def download_audio_complements(self):
     """
     self.n_on_going_lang is an instance variable that controls lang orderseq throughout the class
+    remind also that it works as a 1-based index (instead of a 0-based index)
     """
     for self.n_ongoing_lang in range(1, self.n_langs + 1):
       self.download_audiopart_to_blend_it_w_videoonly()
@@ -1009,146 +971,51 @@ class Downloader:
     COPY it  (with ytid={self.ytid}) to as many as there are audio lang entered"""
     print(scrmsg)
     self.copy_n_rename_videoonly_n_lang_times()
+    audioonlycodes = self.langmapper.audioonlycodes
     scrmsg = f"""5th step ->
-    DOWNLOAD (with ytid={self.ytid}) the audio(s) complements | audioonlycodes={self.audioonlycodes}"""
+    DOWNLOAD (with ytid={self.ytid}) the audio(s) complements | audioonlycodes={audioonlycodes}"""
     print(scrmsg)
     self.download_audio_complements()
     # move all videos from child_tmpdir_abspath to its parent dir
     return True
 
 
-def get_cli_args():
+def loop_over_ytids(cliprm_o):
   """
-  Required parameters:
-    src_rootdir_abspath & trg_rootdir_abspath
 
-  Optional parameter:
-    resolution_tuple
-
-  :return: srctree_abspath, trg_rootdir_abspath, resolution_tuple
-  """
-  try:
-    if args.h or args.help:
-      print(__doc__)
-      sys.exit(0)
-  except AttributeError:
-    pass
-  if args.docstr:
-    show_docstrhelp_n_exit()
-  ytid = args.ytid
-  boo_readfile = args.useinputfile
-  # default to the current working directory if none is given
-  dirpath = args.dirpath or os.path.abspath(".")
-  videoonlycode = args.videoonlycode or None
-  audiomainnumber = args.amn or DEFAULT_AUDIO_MAIN_NUMBER
-  sfx_n_2letlng_dict = args.map or DEFAULT_SFX_W_2LETLNG_MAPDCT
-  nvdseq = args.nvdseq or 1
-  return ytid, boo_readfile, dirpath, videoonlycode, audiomainnumber, nvdseq, sfx_n_2letlng_dict
-
-
-def verify_n_trans_sfx_n_2letlng_dict(sfx_n_2letlng_dict):
-  return ytstrfs.trans_str_sfx_n_2letlng_map_to_dict_or_raise(sfx_n_2letlng_dict)
-
-
-def confirm_cli_args_with_user(ytids, dirpath, videoonlycode, audiomainnumber, nvdseq, sfx_n_2letlng_dict):
-  if not os.path.isdir(dirpath):
-    scrmsg = f"Source directory [{dirpath}] does not exist. Please, retry."
+    scrmsg = f"ytid = {ytid}"
     print(scrmsg)
-    return False
-  sfx_n_2letlng_dict = verify_n_trans_sfx_n_2letlng_dict(sfx_n_2letlng_dict)
-  charrule = '=' * 20
-  print(charrule)
-  print('Input parameters entered')
-  print(charrule)
-  scrmsg = f"""
-  => ytids = {ytids} | total = {len(ytids)} | sequential sufix for the 'vd' namemarker = {nvdseq} 
-  -------------------
-  => dirpath = [{dirpath}]
-  (confer default subdirectory "{default_videodld_tmpdir}" or other)
-  -------------------
-  => videoonlycode = {videoonlycode} | audiomainnumber = {audiomainnumber}
-  => sfx_n_2letlng_dict = {sfx_n_2letlng_dict}
+
+  :param cliprm_o:
+  :return:
   """
-  print(scrmsg)
-  print(charrule)
-  scrmsg = "Are the parameters above okay? (Y/n) [ENTER] means Yes "
-  ans = input(scrmsg)
-  print(charrule)
-  confirmed = False
-  if ans in ['Y', 'y', '']:
-    confirmed = True
-  return confirmed, sfx_n_2letlng_dict
-
-
-def get_default_ytids_filepath(p_dirpath):
-  ytids_filename = DEFAULT_YTIDS_FILENAME
-  default_ytids_filepath = os.path.join(p_dirpath, ytids_filename)
-  if not os.path.isfile(default_ytids_filepath):
-    errmsg = f"YTIDs filepath [{default_ytids_filepath}] does not exist. Please, create it and retry."
-    raise OSError(errmsg)
-  return default_ytids_filepath
-
-
-def adhoctest1():
-  ytid = 'abc+10'
-  scrmsg = f'Testing verify_ytid_validity_or_raise({ytid})'
-  print(scrmsg)
-  ytstrfs.verify_ytid_validity_or_raise(ytid)
-
-
-def get_cli_params_n_confirm():
-  ytid, b_useinputfile, dirpath, videoonlycode, audiomainnumber, nvdseq, sfx_n_2letlng_dict = get_cli_args()
-  ytid = ytstrfs.extract_ytid_from_yturl_or_itself_or_none(ytid)
-  ytids = []
-  if b_useinputfile:
-    ytids = ytstrfs.read_ytids_from_file_n_get_as_list(get_default_ytids_filepath(dirpath))
-    if ytid:
-      ytids.append(ytid)
-  else:
-    if ytid:
-      ytids = [ytid]
-  if len(ytids) == 0:
-    scrmsg = "No ytid given. Please, enter at least one ytid."
-    print(scrmsg)
-    return []
-  ytids = ytstrfs.trans_list_as_uniq_keeping_order_n_mutable(ytids)
-  confirmed, audioonlycodes_as_list = confirm_cli_args_with_user(
-    ytids, dirpath, videoonlycode,
-    audiomainnumber, nvdseq,
-    sfx_n_2letlng_dict
-  )
-  if not confirmed:
-    return None
-  params_packed = (
-    ytids, dirpath, videoonlycode,
-    audiomainnumber, nvdseq,
-    sfx_n_2letlng_dict
-  )
-  return params_packed
+  for ytid in cliprm_o.ytids:
+    downloader = Downloader(
+      ytid=ytid,
+      dlddir_abspath=cliprm_o.dirpath,
+      videoonlycode=cliprm_o.videoonlycode,
+      audiomainnumber=cliprm_o.audiomainnumber,
+      nvdseq=cliprm_o.nvdseq,
+      sfx_n_2letlng_dict=cliprm_o.sfx_n_2letlng_dict
+    )
+    _ = downloader.process()  # process() returns a boolean (True | False)
+  return True
 
 
 def process():
   """
   """
-  params_packed = get_cli_params_n_confirm()
-  (
-   ytids, dirpath,
-   videoonlycode, audiomainnumber,
-   nvdseq, sfx_n_2letlng_dict
-  ) = params_packed
-  if ytids is None or len(ytids) == 0:
+  cliprm_o = clip.CliParam()
+  cliprm_o.read_n_confirm_params()
+  if len(cliprm_o.ytids) == 0:
+    scrmsg = f"No ytids ({cliprm_o.ytids}) to download from CLI."
+    print(scrmsg)
     return False
-  for ytid in ytids:
-    downloader = Downloader(
-      ytid=ytid,
-      dlddir_abspath=dirpath,
-      videoonlycode=videoonlycode,
-      audiomainnumber=audiomainnumber,
-      nvdseq=nvdseq,
-      sfx_n_2letlng_dict=sfx_n_2letlng_dict
-    )
-    _ = downloader.process()  # process() returns a boolean (True | False)
-  return True
+  if not cliprm_o.confirmed:
+    scrmsg = f"Not running scripting, confirmation {cliprm_o.confirmed})."
+    print(scrmsg)
+    return False
+  return loop_over_ytids(cliprm_o)
 
 
 if __name__ == '__main__':

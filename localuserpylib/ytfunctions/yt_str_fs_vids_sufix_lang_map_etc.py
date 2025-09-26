@@ -2,6 +2,10 @@
 """
 localuserpylib/ytfunctions/yt_str_fs_vids_sufix_lang_map_etc.py
 """
+# from collections.abc import Iterable
+# from typing import Tuple
+from typing import Generator
+from typing import Any
 import os
 import string
 import re
@@ -202,13 +206,17 @@ def trans_str_sfx_n_2letlng_map_to_dict_or_raise(pdict):
   This function is called for help instance SufixLangMapper
   and also from "outside" script dlYouTubeWhenThereAreDubbed
   """
+  if isinstance(pdict, dict):
+    return pdict
   outdict = {}
   pp = pdict.split(',')
   for elem in pp:
     try:
       pair = elem.split(':')
-      number = int(pair[0])
+      pair0 = pair[0].strip(' \t\r\n')
+      number = int(pair0)
       twolettercode = pair[1]
+      twolettercode = twolettercode.strip(' \t\r\n')
       outdict.update({number: twolettercode})
       if len(twolettercode) != 2:
         errmsg = f"Error: a twolettercode should have 2 letter, it has {len(twolettercode)} in {pdict}"
@@ -221,8 +229,9 @@ def trans_str_sfx_n_2letlng_map_to_dict_or_raise(pdict):
 
 class SufixLanguageMapper:
 
-  def __init__(self, pdict: dict | str, audiomainnumber=249):
-    self.indict = pdict
+  def __init__(self, pdict: dict[int, str] | str, audiomainnumber=249):
+    self.no_dubs = False
+    self.indict: dict[int, str] = pdict
     self.at_number = 0
     self.reached_end = False
     self.twolettercodes_given = []
@@ -243,7 +252,63 @@ class SufixLanguageMapper:
     self.twolettercodes_given.sort()
     self.twolettercodes_given.reverse()  # because pop() will used ahead
 
-  def get_twolettercode_for_sufix_n(self, idx):
+  @property
+  def dict_as_items(self) -> list[tuple[int, str]]:
+    """
+    About type-annotation:
+    if the return had not the list() function, the return type-annotation should be:
+      Iterable[Tuple[int, str]] when the iterable (without list()) is returned
+    """
+    return list(self.indict.items())
+
+  @property
+  def audioonlycodes(self) -> list[str]:
+    """
+    Returns the audioonlycode list
+    This list is dynamically formed at each call
+    :return: aocs
+    """
+    aocs = []
+    for item in self.dict_as_items:
+      numbersufix = item[0]
+      audioonlycode = f"{self.audiomainnumber}-{numbersufix}"
+      aocs.append(audioonlycode)
+    return aocs
+
+  @property
+  def size(self) -> int:  # Iterable[Tuple[int, str]] when the iterable (without list()) is returned
+    return len(self.indict)
+
+  def turn_off_dubs(self):
+    self.no_dubs = True
+
+  def get_first_2lettlangcode(self) -> str | None:
+    if self.no_dubs:
+      return 'un'
+    try:
+      twolettercode = self.indict[0]
+      return twolettercode
+    except IndexError:
+      pass
+    return None
+
+  def get_ith_2lettlangcode_1idxbased(self, n) -> str | None:
+    if self.no_dubs:
+      return 'un'
+    try:
+      i = n - 1
+      return self.dict_as_items[i][1]
+    except IndexError:
+      pass
+    return None
+
+  def get_twolettercode_for_sufix_n(self, idx) -> str | None:
+    """
+    The different between this method and the one is that this one the index is the key itself.
+    For the other, the index is its sequencial one.
+    """
+    if self.no_dubs:
+      return 'un'
     try:
       twolettercode = self.indict[idx]
       return twolettercode
@@ -251,7 +316,26 @@ class SufixLanguageMapper:
       pass
     return None
 
-  def next(self) -> str | None:
+  def get_audioonlycodesufix_fr_idx(self, i):
+    return self.dict_as_items[i][0]
+
+  def get_audioonlycode_for_idx(self, zerobasedidx):
+    i = zerobasedidx
+    sufix = self.get_audioonlycodesufix_fr_idx(i)
+    audioonlycode = f"{self.audiomainnumber}-{sufix}"
+    return audioonlycode
+
+  def get_audioonlycode_for_1baseidx(self, onebasedidx):
+    i = onebasedidx - 1
+    return self.get_audioonlycode_for_idx(i)
+
+  def next_2lettercode(self) -> str | None:
+    """
+    This method is to be deleted, because methods traverse`X`() replace it
+    :return:
+    """
+    if self.no_dubs:
+      return 'un'
     if len(self.twolettercodes_given) == 0:
       return None
     idx = self.twolettercodes_given.pop()
@@ -260,7 +344,7 @@ class SufixLanguageMapper:
       return None
     return twolettercode
 
-  def traverse_sufix_n_twolettercode(self):
+  def traverse_sufix_n_twolettercode(self) -> Generator[tuple[int, str], Any, None]:
     """
     Traverses (loops over with yield [a generator]) the items in self.indict
     This method is "disconnected" with next(), beucase:
@@ -281,6 +365,8 @@ class SufixLanguageMapper:
 
 class SufixLanguageMapFinder:
   """
+  DEPRECATED: this class will be substituted by the one above SufixLanguageMapper
+
   This class finds a map (dict) of sufixes to languages
     for audio-only-codes available from the YouTube parameters
     (used via yt-dlp).
@@ -457,11 +543,27 @@ class SufixLanguageMapFinder:
 
 
 def adhoctest5():
-  strdict = '1:pt,0:en'
+  strdict = '0:en,1:pt'
   langmapper = SufixLanguageMapper(strdict)
   print(langmapper)
   for item in langmapper.traverse_sufix_n_twolettercode():
     print(item)
+  first_2lett = langmapper.get_first_2lettlangcode()
+  print('first_2lett', first_2lett)
+  print(langmapper.dict_as_items)
+  any_2lett = langmapper.get_ith_2lettlangcode_1idxbased(2)
+  print('2lett 1bidx', 2, any_2lett)
+  audioonlycode = langmapper.get_audioonlycode_for_idx(0)
+  scrmsg = f"audioonlycode for idx {0} = {audioonlycode}"
+  print(scrmsg)
+  audioonlycode = langmapper.get_audioonlycode_for_1baseidx(1)
+  scrmsg = f"audioonlycode for 1-base idx {1} = {audioonlycode}"
+  print(scrmsg)
+  onebasedidx = 2
+  audioonlycode = langmapper.get_audioonlycode_for_1baseidx(onebasedidx)
+  scrmsg = f"audioonlycode for 1-base idx {onebasedidx} = {audioonlycode}"
+  print(scrmsg)
+  print(langmapper.audioonlycodes)
 
 
 def adhoctest4():
