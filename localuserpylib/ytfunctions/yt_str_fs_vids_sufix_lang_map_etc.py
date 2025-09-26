@@ -19,6 +19,19 @@ cmpld_ytid_in_ytdlp_filename_pattern = re.compile(ytid_in_ytdlp_filename_pattern
 ytid_instr_af_equalsign = r'\=([A-Za-z0-9_-]{11})(?=(&|$))'
 cmpld_ytid_instr_af_equalsign_pattern = re.compile(ytid_instr_af_equalsign)
 ytvideobaseurl = "https://www.youtube.com/watch?v="
+TWOLETTER_N_LANGUAGENAME_DICTMAP = {
+  'de': 'German',
+  'en': 'English',
+  'es': 'Spanish',
+  'fr': 'French',
+  'hi': 'Hindi',
+  'id': 'Indonesian',
+  'it': 'Italian',
+  'ja': 'Japaneses',
+  'po': 'Polish',
+  'pt': 'Portuguese',
+  'ru': 'Russian',
+}
 
 
 def is_str_enc64(line: str | None) -> bool:
@@ -151,6 +164,11 @@ def verify_ytid_validity_or_raise(ytid):
     raise ValueError(errmsg)
 
 
+def get_validated_ytid_or_raise(ytid):
+  verify_ytid_validity_or_raise(ytid)
+  return ytid
+
+
 def get_nsufix_fr_audioonlycode(audioonlycode: str | None) -> int | None:
   """
   audioonlycode is a str with "a number dash another number", this latter is the nsufix
@@ -227,17 +245,50 @@ def trans_str_sfx_n_2letlng_map_to_dict_or_raise(pdict):
   return outdict
 
 
+class LangAttr:
+
+  def __init__(self, langless_audiocode, nsufix, twolettercode, seq_order):
+    self.langless_audiocode = langless_audiocode
+    self.nsufix = nsufix
+    self.twolettercode = twolettercode
+    self.seq_order = seq_order
+
+  @property
+  def audioonlycode(self):
+    aoc = f"{self.langless_audiocode}-{self.nsufix}"
+    return aoc
+
+  @property
+  def langname(self) -> str:
+    try:
+      _langname = TWOLETTER_N_LANGUAGENAME_DICTMAP[self.twolettercode]
+      return _langname
+    except IndexError:
+      pass
+    return 'not-known'
+
+  def __str__(self):
+    la = self.langless_audiocode
+    aoc = self.audioonlycode
+    tlc = self.twolettercode
+    ln = self.langname
+    outstr = f"""{self.__class__.__name__}
+    seq_order = {self.seq_order} | twolettercode = {tlc} |  language name = {ln}
+    langless_audiocode = {la} | nsufix = {self.nsufix} | audioonlycode = {aoc}"""
+    return outstr
+
+
 class SufixLanguageMapper:
 
   def __init__(self, pdict: dict[int, str] | str, audiomainnumber=249):
     self.no_dubs = False
     self.indict: dict[int, str] = pdict
+    self._dict_as_items = None
     self.at_number = 0
     self.reached_end = False
     self.twolettercodes_given = []
     self.audiomainnumber = audiomainnumber
     self.treat_indict()
-    self.init_twolettercodes_given()
 
   def treat_indict(self):
     if self.indict is None:
@@ -246,20 +297,18 @@ class SufixLanguageMapper:
     if isinstance(self.indict, str):
       self.indict = trans_str_sfx_n_2letlng_map_to_dict_or_raise(self.indict)
 
-  def init_twolettercodes_given(self):
-    for n in self.indict:
-      self.twolettercodes_given.append(n)
-    self.twolettercodes_given.sort()
-    self.twolettercodes_given.reverse()  # because pop() will used ahead
-
   @property
-  def dict_as_items(self) -> list[tuple[int, str]]:
+  def dict_as_items_in_order(self) -> list[tuple[int, str]]:
     """
     About type-annotation:
     if the return had not the list() function, the return type-annotation should be:
       Iterable[Tuple[int, str]] when the iterable (without list()) is returned
     """
-    return list(self.indict.items())
+    if self._dict_as_items is not None:
+      return self._dict_as_items
+    ordered_dict = sorted(self.indict.items(), key=lambda pair: pair[0])
+    self._dict_as_items = list(ordered_dict)
+    return self._dict_as_items
 
   @property
   def audioonlycodes(self) -> list[str]:
@@ -269,7 +318,7 @@ class SufixLanguageMapper:
     :return: aocs
     """
     aocs = []
-    for item in self.dict_as_items:
+    for item in self.dict_as_items_in_order:
       numbersufix = item[0]
       audioonlycode = f"{self.audiomainnumber}-{numbersufix}"
       aocs.append(audioonlycode)
@@ -284,20 +333,40 @@ class SufixLanguageMapper:
 
   def get_first_2lettlangcode(self) -> str | None:
     if self.no_dubs:
-      return 'un'
+      return 'un'  # 'unique' (no dubs)
     try:
-      twolettercode = self.indict[0]
+      twolettercode = self.dict_as_items_in_order[0][1]
       return twolettercode
     except IndexError:
       pass
-    return None
+    return 'un'  # 'un' above means 'no dubs', but here it would mean 'unknown'
+
+  def get_first_langobj(self) -> LangAttr:
+    if self.no_dubs:
+      langer = LangAttr(
+        langless_audiocode=self.audiomainnumber,
+        nsufix=-1,
+        twolettercode='un',  # un stands for 'unique' and also that there's only the original language
+        seq_order=1
+      )
+      return langer
+    pair = self.dict_as_items_in_order[0]
+    nsufix = pair[0]
+    twolettercode = pair[1]
+    langer = LangAttr(
+      langless_audiocode=self.audiomainnumber,
+      nsufix=nsufix,
+      twolettercode=twolettercode,
+      seq_order=1
+    )
+    return langer
 
   def get_ith_2lettlangcode_1idxbased(self, n) -> str | None:
     if self.no_dubs:
       return 'un'
     try:
       i = n - 1
-      return self.dict_as_items[i][1]
+      return self.dict_as_items_in_order[i][1]
     except IndexError:
       pass
     return None
@@ -310,39 +379,32 @@ class SufixLanguageMapper:
     if self.no_dubs:
       return 'un'
     try:
-      twolettercode = self.indict[idx]
+      pair = self.dict_as_items_in_order[idx]
+      twolettercode = pair[1]
       return twolettercode
     except KeyError:
       pass
     return None
 
-  def get_audioonlycodesufix_fr_idx(self, i):
-    return self.dict_as_items[i][0]
+  def get_audioonlycodesufix_fr_idx(self, idx) -> int | None:
+    try:
+      pair = self.dict_as_items_in_order[idx]
+      nsufix = pair[0]
+      return nsufix
+    except KeyError:
+      pass
+    return None
 
-  def get_audioonlycode_for_idx(self, zerobasedidx):
-    i = zerobasedidx
-    sufix = self.get_audioonlycodesufix_fr_idx(i)
-    audioonlycode = f"{self.audiomainnumber}-{sufix}"
+  def get_audioonlycode_for_idx(self, idx) -> str | None:
+    nsufix = self.get_audioonlycodesufix_fr_idx(idx)
+    if nsufix is None:
+      return None
+    audioonlycode = f"{self.audiomainnumber}-{nsufix}"
     return audioonlycode
 
-  def get_audioonlycode_for_1baseidx(self, onebasedidx):
+  def get_audioonlycode_for_1baseidx(self, onebasedidx: int) -> str | None:
     i = onebasedidx - 1
     return self.get_audioonlycode_for_idx(i)
-
-  def next_2lettercode(self) -> str | None:
-    """
-    This method is to be deleted, because methods traverse`X`() replace it
-    :return:
-    """
-    if self.no_dubs:
-      return 'un'
-    if len(self.twolettercodes_given) == 0:
-      return None
-    idx = self.twolettercodes_given.pop()
-    twolettercode = self.get_twolettercode_for_sufix_n(idx)
-    if twolettercode is None:
-      return None
-    return twolettercode
 
   def traverse_sufix_n_twolettercode(self) -> Generator[tuple[int, str], Any, None]:
     """
@@ -352,9 +414,32 @@ class SufixLanguageMapper:
       2 - this method, on the contrary, loops over original self.indict
     """
     items = self.indict.items()
-    items = sorted(items, key=lambda i: i[0])
+    items = sorted(items, key=lambda i: i[0])  # this keeps the ordering from least to greatest nsufix (the langnumber)
     for item in items:
       yield item
+
+  def loop_over_langs(self) -> Generator[LangAttr, Any, None]:
+    """
+    In terms of functionality, the main attribute (or property) of this object
+      is the dict_mapping of nsufix with 2-letter-code items
+
+    This method loops over the these items transforming them into LangAttr objects.
+      These 'langer' objects will be "consumed" in the client-caller that issues the
+      yt-dlp download runs.
+
+    :return:
+    """
+    for i, pair in enumerate(self.traverse_sufix_n_twolettercode()):
+      seq_order = i + 1
+      nsufix = pair[0]
+      twolettercode = pair[1]
+      langer = LangAttr(
+        langless_audiocode=self.audiomainnumber,
+        nsufix=nsufix,
+        twolettercode=twolettercode,
+        seq_order=seq_order
+      )
+      yield langer
 
   def __str__(self):
     outstr = f"""
@@ -542,6 +627,16 @@ class SufixLanguageMapFinder:
     return outstr
 
 
+def adhoctest6():
+  # testing strdict having 'unordered keys'
+  strdict = '1:fr,0:de,5:it,2:es,11:en,8:ru'
+  langmapper = SufixLanguageMapper(strdict)
+  print(langmapper)
+  for langer in langmapper.loop_over_langs():
+    scrmsg = f"langer {langer}"
+    print(scrmsg)
+
+
 def adhoctest5():
   strdict = '0:en,1:pt'
   langmapper = SufixLanguageMapper(strdict)
@@ -550,7 +645,7 @@ def adhoctest5():
     print(item)
   first_2lett = langmapper.get_first_2lettlangcode()
   print('first_2lett', first_2lett)
-  print(langmapper.dict_as_items)
+  print(langmapper.dict_as_items_in_order)
   any_2lett = langmapper.get_ith_2lettlangcode_1idxbased(2)
   print('2lett 1bidx', 2, any_2lett)
   audioonlycode = langmapper.get_audioonlycode_for_idx(0)
@@ -678,3 +773,4 @@ if __name__ == '__main__':
   adhoc_test3()
   """
   adhoctest5()
+  adhoctest6()

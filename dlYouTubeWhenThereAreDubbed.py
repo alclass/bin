@@ -34,22 +34,22 @@ Usage (this is about to receive some adjustments):
   (a sketch of this upgrade comes at the end)
 ======
 
-Proposed (newer) syntax:
+Syntax:
   $dlYouTubeWhenThereAreDubbed.py [--ytid <ytid or yturl within "">]
     [--dirpath "<dirpath>"]
-    [--dirpath]
     [--useinputfile]
     [--voc <video-only-code-number>]
     [--amn <audio-main-number>]
     [--map <dictionary-map-informing-sufixes-and-their-2-letter-language-codes>]
+    [--seq <sequence-number-for-token-vdN-2letter>]
 
-
-Older syntax:
+Older syntax (no longer valid):
   $dlYouTubeWhenThereAreDubbed.py [--ytid <ytid or yturl within "">]
     [--dirpath "<dirpath>"]
     [--useinputfile]
     [--videoonlycode <video-format-number>]
     --audioonlycodes <list of audio-format-codes>
+    [--nvdseq <sequence-number-for-token-vdN-2letter>]
 
 Where:
   <ytid> => the ENCODE64 11-character YouTube video id
@@ -62,15 +62,22 @@ Where:
   <list of audio-format-codes> => a list of all audio-only-codes desired for the yt-dlp downloads
   <dirpath> is the absolute directory path from where the default download subdirectory resides
     obs: the download directory is a prenamed subdirectory inside <dirpath>
+  <dictionary-map-informing-sufixes-and-their-2-letter-language-codes> => see the examples (above and below)
+  <sequence-number-for-token-vdN-2letter> => a sequence number to be appended to "token" vd (example: seq=1 -> "vd1-en")
 
 Example:
 ========
   $dlYouTubeWhenThereAreDubbed.py --ytid abcABC123-_
-    --audioonlycodes 233-0,233-1
+    --amn 233 -- --map "0:en,1:pt"
 
 The above example 'automatizes' the following two yt-dlp downloads:
   $yt-dlp -w -f 160+233-0 abcABC123-_
   $yt-dlp -w -f 160+233-1 abcABC123-_
+
+Notice:
+ 1 - yt-dlp doesn't know about the two-letter-codes 'en' & 'pt', these are used later on for file renaming.
+ 2 - videoonlycode 160 though not given was set because it's the default
+     (defaults are stll hardcoded at the time of writing, it may become a configurable in a config-file)
 
 The result will be the download of two videofiles: one with the language audio 233-0
   and the other with the language audio 233-1 (be they original or autodubbed)
@@ -81,19 +88,23 @@ Care with the use of parameter --useinputfile:
 =============================================
   if the user wants to download many videos at once, it can be done with --useinputfile,
     suffice a youtube-ids.txt is created with all the ytid's consolidated
-  however, this script (and this is reinforced below) does not know beforehand if a video
-   has or doesn't have a specific language for it.
+  however, this script (and this is recited below) does not know beforehand if a video
+   has or doesn't have a specific language for it, or more formally, it an audioonlycode fits it.
 
 Explanation
 ===========
 
 This script accepts the following input:
-  1  it receives as input a youtube-video-id (ytid)
-  2  alternatively, instead of a ytid, it may receive as input ytids in a text file (whose name is youtube-ids.txt)
-  3  it receives as input the videoonlycode (it's only one number, and it's an integer)
-  4  it also receives the audioonlycodes for languages (it does not discover them, the user has to enter them)
+  1  a parameter for a youtube-video-id (ytid)
+    1-1  alternatively, instead of a ytid, it may receive as input ytids in a text file (whose name is youtube-ids.txt)
+  2 a parameter for the videoonlycode (--voc) (it's only one number, and it's an integer)
+  4 a parameter for the audiomainnumber (--amn)
+  5 a 'mapping' (--map), as text/string, telling each sufix represents which 2-letter-code language
+    (example: '0: en, 1: pt' says sufix 0 is English and sufix 1 is Portuguese)
+  6 the audioonlycode is formed by joining the `audiomainnumber` with its number sufix (given in the 'mapping')
+    (example: audiomainnumber=249, sufix=0 (for English as in the example above), then audioonlycode="249-0"
 
-Observation about standardization of audio format codes:
+Observation about (the lack of) standardization (the equalility) of audio format codes:
   As far as we've observed, these codes are not "fully" standardized
     For example, in general, a video that is autodubbed into English
       has sufix "-0" added to its audioonlycode (example: 233-0 or 234-0),
@@ -197,13 +208,16 @@ On 2025-09-23:
     FROM: a list of "dashed" number (e.g. "[249-0, 249-1"])
     TO: a number  (e.g. "249")
   --audioonlycodes may become --audiomainnumber
+On 2025-09-26:
+  the parameters have been changed, the main code refactored (a new class now help form the audiocodes),
+  it's running though some improvements are still needed "here and there".
 
 Justification:
   the number of YouTube autodubbed available languages
     not only may vary from video to video (especially in English originals),
     but it may also grow in the future
+      (for example: Russian appeared -- we haven't seen it before -- in some original-English videos)
 """
-# import argparse
 import os.path
 import shutil
 import subprocess
@@ -213,9 +227,9 @@ import localuserpylib.regexfs.filenamevalidator_cls as fnval  # .FilenameValidat
 import localuserpylib.ytfunctions.osentry_class as ose  # ose.OSEntry
 import localuserpylib.ytfunctions.cliparams_for_utubewhendub as clip  # clip.CliParam
 OSEntry = ose.OSEntry
+# DEFAULT_AUDIOVIDEO_CODE = ose.DEFAULT_AUDIOVIDEO_CODE
+# DEFAULT_AUDIOVIDEO_DOT_EXT = ose.DEFAULT_AUDIOVIDEO_DOT_EXT
 DEFAULT_YTIDS_FILENAME = ose.DEFAULT_YTIDS_FILENAME
-DEFAULT_AUDIOVIDEO_CODE = ose.DEFAULT_AUDIOVIDEO_CODE
-DEFAULT_AUDIOVIDEO_DOT_EXT = ose.DEFAULT_AUDIOVIDEO_DOT_EXT
 DEFAULT_AUDIO_MAIN_NUMBER = ose.DEFAULT_AUDIO_MAIN_NUMBER
 DEFAULT_SFX_W_2LETLNG_MAPDCT = ose.DEFAULT_SFX_W_2LETLNG_MAPDCT
 DEFAULT_VIDEO_ONLY_CODE = ose.DEFAULT_VIDEO_ONLY_CODE
@@ -236,7 +250,7 @@ class Downloader:
   DEFAULT_AUDIO_MAIN_NUMBER = DEFAULT_AUDIO_MAIN_NUMBER
   videodld_tmpdirname = default_videodld_tmpdir
   # class-wide static interpolable-string constants
-  comm_line_base = 'yt-dlp -w -f {compositecode} "{videourl}"'
+  comm_line_base = 'yt-dlp -w -f {ytdlp_fcode_str} "{videourl}"'
   video_baseurl = 'https://www.youtube.com/watch?v={ytid}'
 
   def __init__(
@@ -246,66 +260,66 @@ class Downloader:
       videoonlycode: int = None,
       audiomainnumber: int = None,
       nvdseq: int = None,
-      sfx_n_2letlng_dict: dict = None,
+      sfx_n_2letlng_dict: dict | str = None,
     ):
-    self.ytid = ytid
-    self.nvdseq = nvdseq or 1
+    self.ytid = ytstrfs.get_validated_ytid_or_raise(ytid)
     self.dlddir_abspath = dlddir_abspath
-    self.videoonlycode = videoonlycode
-    self.audiomainnumber = audiomainnumber  # example: 233, 234, 249 etc
-    self.sfx_n_2letlng_dict = sfx_n_2letlng_dict
-    self.treat_input()
-    self.ytsufixlang_o = ytstrfs.SufixLanguageMapFinder(self.sfx_n_2letlng_dict)
+    self.treat_dlddir_abspath()
+    self.videoonlycode = videoonlycode or DEFAULT_VIDEO_ONLY_CODE
+    self.audiomainnumber = audiomainnumber or DEFAULT_AUDIO_MAIN_NUMBER  # example: 233, 234, 249 etc
+    self.nvdseq = nvdseq or 1
+    sfx_n_2letlng_dict = ytstrfs.trans_str_sfx_n_2letlng_map_to_dict_or_raise(sfx_n_2letlng_dict)
+    # the langmapper object contains the attributes that help form the audioonlycodes and the filename-rename-tokens
+    self.langmapper = ytstrfs.SufixLanguageMapper(sfx_n_2letlng_dict, self.audiomainnumber)
+    self.cur_lng_obj = None  # each language is abstracted to a "language object" as each download happens
     self.b_verified_once_tmpdir_abspath = None
-    self.prename = None
+    # self.prename = None
     self.previously_existing_filenames_in_tmpdir = []
-    self.n_ongoing_lang = 0
-    # this object gives audiocode variables such as audiocodemain and audiocodesufix
-    self.langmapper = ytstrfs.SufixLanguageMapper(self.sfx_n_2letlng_dict, self.audiomainnumber)
     self.osentry = OSEntry(
       workdir_abspath=self.child_tmpdir_abspath,
       basefilename=None,  # later to be known
       videoonly_or_audio_code=self.videoonlycode
     )
-    pass
-    print('osentry =', self.osentry)
-    # self.va_osentry = []
 
-  def treat_input(self):
-    ytstrfs.verify_ytid_validity_or_raise(self.ytid)
-    if self.dlddir_abspath is None:
+  def treat_dlddir_abspath(self):
+    if self.dlddir_abspath is None or self.dlddir_abspath == '.':
       # default is the current working directory
       self.dlddir_abspath = os.path.abspath('.')
-    if self.videoonlycode is None:
-      # this is the default for the videocode
-      self.videoonlycode = self.DEFAULT_VIDEO_ONLY_CODE
-    if self.audiomainnumber is None or not isinstance(self.audiomainnumber, int):
-      # this default for the audiocodes generally works when English is autodubbed and another language is the original
-      # notice that this script, at the time of writing, does not know about which language is which (@see docstr above)
-      self.audiomainnumber = self.DEFAULT_AUDIO_MAIN_NUMBER
-    if self.sfx_n_2letlng_dict is None:
-      return
-    for number in self.sfx_n_2letlng_dict:
-      twolettercode = self.sfx_n_2letlng_dict[number]
-      if len(twolettercode) != 2:
-        errmsg = f"The 2-letter-language-code [{twolettercode}] should have only 2 letter."
-        raise ValueError(errmsg)
+    if not os.path.isdir(self.dlddir_abspath):
+      errmsg = f"Error: Download directory [{self.dlddir_abspath}] does not exist."
+      raise OSError(errmsg)
 
   @property
-  def n_langs(self):
-    return len(self.sfx_n_2letlng_dict)
+  def n_ongoing_lang(self) -> int:
+    """
+    Returns an int that represents the sequencial order of a download language
+      given its sufix number inside the map-dict-input.
+
+    Example (the key in dict is the suffix number, the value is the 2-letter-language-code):
+      1st
+        if language dict is {0: 'en', 1: 'pt'}
+        then 'en' has seq_order=1 and 'pt' has seq_order=2
+      2nd
+        if language dict is {5: 'it', 1: 'pt', '11': 'en'}
+        then 'pt' has seq_order=1, 'it' has seq_order=2, and 'en' has seq_order=3
+          # notice that, though example-dict may not show it, key ordering should be ascendent (1, 2, 3...)
+          # i.e., as list(sorted(dict.item())): [(1: 'pt'), (5: 'it'), ('11': 'en')]
+    """
+    if self.cur_lng_obj is None:
+      return -1
+    return self.cur_lng_obj.seq_order
+
+  @property
+  def total_langs(self) -> int:
+    if self.langmapper is None:
+      return -1
+    return self.langmapper.size
 
   @property
   def videourl(self):
     pdict = {'ytid': self.ytid}
     url = self.video_baseurl.format(**pdict)
     return url
-
-  def get_lang2lettercode_fr_audioonlycode(self, audioonlycode):
-    """
-    audioonlycode = self.audioonlycodes[self.n_ongoing_lang-1]
-    """
-    return self.ytsufixlang_o.get_lang2lettercode_fr_audioonlycode(audioonlycode)
 
   def rename_canofile_to_the_bk1sufixed(self):
     """
@@ -315,11 +329,16 @@ class Downloader:
     """
     srcfilepath = self.osentry.fp_for_fn_as_name_fsufix_ext
     srcfilename = self.osentry.fn_as_name_fsufix_ext
-    audiocode = self.langmapper.get_first_2lettlangcode()  # index 0 is the first language
+    # at this point, self.cur_lng_obj does not yet exist, because it will appear later in downloading the audios
+    lng_obj = self.langmapper.get_first_langobj()
+    twolettercode = lng_obj.twolettercode  # index 0 is the first language
+    ln = lng_obj.langname
+    nsufix = lng_obj.nsufix  # index 0 is the first language
+    audioonlycode = lng_obj.audioonlycode  # index 0 is the first language
     trgfilepath = self.osentry.get_fp_for_fn_as_name_fsufix_ext_bksufix(1)
     trgfilename = self.osentry.get_fn_as_name_fsufix_ext_bksufix(1)
     if not os.path.isfile(srcfilepath):
-      scrmsg = f"""Cannot rename | lang=1 audiocode={audiocode}
+      scrmsg = f"""Cannot rename lang={nsufix} twolettercode={twolettercode} lang={ln}
         FROM canofilename = [{srcfilename}]
         TO bk1sufixfilename = [{trgfilename}]
           => reason: because {srcfilename} does not exist in folder. Halting.
@@ -327,7 +346,7 @@ class Downloader:
       print(scrmsg)
       sys.exit(1)
     if os.path.isfile(trgfilepath):
-      scrmsg = f"""Already renamed | lang=1 audiocode={audiocode}
+      scrmsg = f"""Already renamed lang={nsufix} 2-letter lang code={twolettercode} lang={ln}
         -------------------- 
         FROM (canofilename)  : [{srcfilename}]
         TO (bk1sufixfilename): [{trgfilename}]
@@ -338,9 +357,10 @@ class Downloader:
       return
     try:
       os.rename(srcfilepath, trgfilepath)
-      print("Renamed accomplished")
+      scrmsg = f"Renamed accomplished: ytid={self.ytid} 2-letter lang code={twolettercode} lang={ln}"
+      print(scrmsg)
     except (IOError, OSError) as e:
-      errmsg = f"""Error when attempting to rename bksufix lang=1 audiocode={audiocode} 
+      errmsg = f"""Error when attempting to rename bksufix lang=1 audiocode={audioonlycode} lang={ln} 
       => {e}
 
       Halting.
@@ -354,13 +374,13 @@ class Downloader:
     The following videos are copied each one with its "bk<seq>" sufix
     Obs: The first video is renamed at the end, i.e., the copies are done firstly
     """
-    if self.n_langs == 0:
+    if self.total_langs == 0:
       #  nothing to rename, return
       return
     # the path below represents the video filename as downloaded
     # the first one is a rename
     self.rename_canofile_to_the_bk1sufixed()
-    if self.n_langs == 1:
+    if self.total_langs == 1:
       # done, return
       return
     # at this point, bk1 exists due to the previous rename (the method called above in this)
@@ -370,16 +390,17 @@ class Downloader:
       errmsg = f"Error: srcfilename [{srcfilename}] for copying bk's does not exist."
       print(errmsg)
       sys.exit(1)
-    for i in range(1, self.n_langs):
-      lang_seq = i + 1
-      audiocode = self.langmapper.get_twolettercode_for_sufix_n(i)
-      trgfilepath = self.osentry.get_fp_for_fn_as_name_fsufix_ext_bksufix(lang_seq)
-      trgfilename = self.osentry.get_fn_as_name_fsufix_ext_bksufix(lang_seq)
-      scrmsg = f"""[copying bk1 to the bk{lang_seq} audiocode={audiocode}]
+    for self.cur_lng_obj in self.langmapper.loop_over_langs():
+      seq = self.cur_lng_obj.seq_order
+      audioonlycode = self.cur_lng_obj.audioonlycode
+      ln = self.cur_lng_obj.langname
+      trgfilepath = self.osentry.get_fp_for_fn_as_name_fsufix_ext_bksufix(seq)
+      trgfilename = self.osentry.get_fn_as_name_fsufix_ext_bksufix(seq)
+      scrmsg = f"""[copying bk1 to the bk{seq} for audiocode={audioonlycode} {ln}]
         -------------------- 
         FROM:  {srcfilename}
         TO:    {trgfilename}
-        -------------------- 
+        --------------------
       """
       print(scrmsg)
       if os.path.isfile(trgfilepath):
@@ -618,7 +639,7 @@ class Downloader:
     This may be improved later on if some hypotheses for the
       subprocess.CalledProcessError exception allow this program to continue on
     """
-    strdict = {'compositecode': self.videoonlycode, 'videourl': self.videourl}
+    strdict = {'ytdlp_fcode_str': self.videoonlycode, 'videourl': self.videourl}
     comm = self.comm_line_base.format(**strdict)
     scrmsg = f"@download_video_only | {comm}"
     print(scrmsg)
@@ -798,7 +819,7 @@ class Downloader:
       (The hypothesis below is not guaranteed, but this program will try it.)
 
       When 'subprocess' returns non-0, there's a chance the video does
-        not have language variations which might be also deduced
+        not have language variations. This might be also deduced
         that, instead of audiocode, say, 233-0, 233 (without dash-0) could work
           and form the video in its original language.
         That would complete the job supposing the video does not have another translated language anyway.
@@ -807,23 +828,38 @@ class Downloader:
     scrmsg = "Set language mapper to 'no dubs'"
     print(scrmsg)
 
+  @property
+  def composite_av_code(self) -> str:
+    """
+    This property-method should only be called in the looping of the audio downloads
+      because self.cur_lng_obj will be attributed later until it gets there and,
+      before that, it will remain 'None'
+    :return:
+    """
+    if self.cur_lng_obj is None:
+      errmsg = f"Cannot form the composite video+audio code to yt-dlp, because current language is None"
+      raise ValueError(errmsg)
+    composite_ytdlp_videoaudiocode = f"{self.videoonlycode}+{self.cur_lng_obj.audioonlycode}"
+    return composite_ytdlp_videoaudiocode
+
   def download_audiopart_to_blend_it_w_videoonly(self):
     """
     One caution here:
       the videoonly_canonical_filename (the one without sufixes) should not be present,
-        otherwise yt-dlp will deduce that the composition has already happened,
-        (and inform the video has already been download (when only the videopart has)
-        so if the videoonly_canonical_filename is present
-        (the first 'rename' method below sees to it)
+        otherwise yt-dlp will deduce that the composition (or video-audio merging) has already happened,
+        and inform the video has already been download (when only the video-only-audioless-part has)
+      So, if the videoonly_canonical_filename is present, rename it to its fsufix form.
     """
     self.rename_bksufixedfilename_to_fsufixedfilename_to_avoid_the_vo_redownload()  # it's done by removing number sufix
-    compositecode = self.langmapper.get_audioonlycode_for_1baseidx(self.n_ongoing_lang)
-    scrmsg = f"audio compositecode now is {compositecode}"
+    aoc = self.cur_lng_obj.audioonlycode
+    tlc = self.cur_lng_obj.twolettercode
+    ln = self.cur_lng_obj.langname
+    scrmsg = f"audioonlycode now is {aoc} | its 2-letter-lang-code is {tlc} {ln}"
     print(scrmsg)
-    pdict = {'compositecode': compositecode, 'videourl': self.videourl}
+    pdict = {'ytdlp_fcode_str': self.composite_av_code, 'videourl': self.videourl}
     comm = self.comm_line_base.format(**pdict)
     try:
-      scrmsg = f"audioonlycode={compositecode} | running: {comm}"
+      scrmsg = f"composite_av_code={self.composite_av_code} | running: {comm}"
       print(scrmsg)
       """
       scrmsg = f"Continue with the download above (Y/n)? [ENTER] means Yes"
@@ -856,9 +892,9 @@ class Downloader:
       download is "available" for yt-dlp (as its filename is available)
     """
     srccanofilepath = self.osentry.fp_for_fn_as_name_ext
-    srccanofilename = self.osentry.fp_for_fn_as_name_ext
-    lang2lettcode = self.langmapper.get_ith_2lettlangcode_1idxbased(self.n_ongoing_lang)
-    # "vd1" stands for "video 1", an idea is to make it possible for an increment (ex video 2, 3...) if needed
+    srccanofilename = self.osentry.fn_as_name_ext
+    lang2lettcode = self.cur_lng_obj.twolettercode
+    # "vd1" stands for "video 1", the idea is that the user may need it for organizing purposes
     langprefix = f"vd{self.nvdseq}-{lang2lettcode}"
     langprefixedfilename = f"{langprefix} {self.osentry.fn_as_name_ext}"
     langprefixedfilepath = os.path.join(self.osentry.workdir_abspath, langprefixedfilename)
@@ -867,7 +903,7 @@ class Downloader:
       # srccanofilepath = self.find_existfilepath_of_samecanonicalfilename_w_different_ext_or_none()
       self.osentry.find_n_set_the_canonical_with_another_extension()
       srccanofilepath = self.osentry.fp_for_fn_as_name_ext
-      srccanofilename = self.osentry.fp_for_fn_as_name_ext
+      srccanofilename = self.osentry.fn_as_name_ext
       if srccanofilepath is None:
         # can't rename
         wrnmsg = f"""Cannot rename canonical filename:
@@ -925,13 +961,17 @@ class Downloader:
 
   def download_audio_complements(self):
     """
-    self.n_on_going_lang is an instance variable that controls lang orderseq throughout the class
-    remind also that it works as a 1-based index (instead of a 0-based index)
+    A lang_o carries the following attributes:
+        -> langless_audiocode (the same as audiomainnumber)
+        -> nsufix (the same as langnumber)
+        -> twolettercode (the 2-letter language abbreviation: en, es, fr, etc.)
+        -> seq_order=seq_order (the sequence order of the language: e.g. {0 (seq 1), 3 (seq 2), 6 (seq 3)}
+        -> audioonlycode (dynamic, it's the sum of langless_audiocode, a dash, and the langnumber)
     """
-    for self.n_ongoing_lang in range(1, self.n_langs + 1):
+    for self.cur_lng_obj in self.langmapper.loop_over_langs():  # formerly range(1, self.total_langs + 1):
       self.download_audiopart_to_blend_it_w_videoonly()
       # TODO test if fallback to non_dashed_number_audiocode happened at this point
-      # the reason is that on_going_lang is not following the indices of list audioonlycodes
+      # the reason is that n_ongoing_lang is not following the indices of list audioonlycodes
       # an IndexError protection is done inside the next method, but we should still think about a better solution
       # so that a last renaming may happen to the non_dashed_number_audiocode videofile
       # the way it is now, this last renaming is done manually, if he/she wants to, by the user
@@ -943,11 +983,11 @@ class Downloader:
       1st -> position (cd changedir) at the working tmpdir
       2nd -> download the 160 (or the entered as input) video
       3rd -> disconver the downloaded video's filename
-      4th -> copy it to as many as there audio lang entered
+      4th -> copy it to as many as there are audio langs entered
         (for example: if one language is Italian, another is for English, two copies are made)
       5th -> download the audio(s) for each language
         5-1 download the audiofile proper
-        5-2 "fuse" it with the videofile in store so that the composite results
+        5-2 "fuse" (or merge) it with the videofile in store so that the composite (video with audio) results
     """
     scrmsg = f"""1st step ->
     POSITION (chdir) at the working tmpdir: [{self.osentry.workdir_abspath}]"""
@@ -1007,6 +1047,8 @@ def process():
   """
   cliprm_o = clip.CliParam()
   cliprm_o.read_n_confirm_params()
+  if cliprm_o.show_docstr_n_do_not_run:
+    show_docstrhelp_n_exit()
   if len(cliprm_o.ytids) == 0:
     scrmsg = f"No ytids ({cliprm_o.ytids}) to download from CLI."
     print(scrmsg)

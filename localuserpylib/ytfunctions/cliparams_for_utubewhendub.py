@@ -32,7 +32,7 @@ parser.add_argument("--voc", type=int, default=f"{DEFAULT_AUDIOVIDEO_CODE}",
                     help="video only code: example: 160")
 parser.add_argument("--amn", type=int, default="249",
                     help="audio only codes: example: 233-0,233-1")
-parser.add_argument("--nvdseq", type=int, default=1,
+parser.add_argument("--seq", type=int, default=1,
                     help="the sequencial number that accompanies the 'vd' namemarker at the last renaming")
 parser.add_argument("--map", type=str, default="0:en,1:pt",
                     help="the dictionary-mapping with numbers and the 2-letter language codes (e.g. '0:en,1:pt')")
@@ -46,6 +46,14 @@ def get_default_ytids_filepath(p_dirpath):
     errmsg = f"YTIDs filepath [{default_ytids_filepath}] does not exist. Please, create it and retry."
     raise OSError(errmsg)
   return default_ytids_filepath
+
+
+def get_langname(twolettercode) -> str:
+  try:
+    return ytstrfs.TWOLETTER_N_LANGUAGENAME_DICTMAP[twolettercode]
+  except KeyError:
+    pass
+  return 'not-known'
 
 
 class CliParam:
@@ -92,6 +100,14 @@ class CliParam:
     """
     self.sfx_n_2letlng_dict = ytstrfs.trans_str_sfx_n_2letlng_map_to_dict_or_raise(self.sfx_n_2letlng_dict)
 
+  @property
+  def audioonlycodes(self):
+    aocs = []
+    for nsufix in self.sfx_n_2letlng_dict:
+      audioonlycode = f"{self.audiomainnumber}-{nsufix}"
+      aocs.append(audioonlycode)
+    return aocs
+
   def get_cli_args(self):
     """
     Required parameters:
@@ -113,7 +129,7 @@ class CliParam:
     self.dirpath = args.dirpath or os.path.abspath(".")
     self.videoonlycode = args.voc or None
     self.audiomainnumber = args.amn or DEFAULT_AUDIO_MAIN_NUMBER
-    self.nvdseq = args.nvdseq or 1
+    self.nvdseq = args.seq or 1
     self.sfx_n_2letlng_dict = args.map or DEFAULT_SFX_W_2LETLNG_MAPDCT
     self.verify_n_trans_sfx_n_2letlng_dict()
 
@@ -130,27 +146,38 @@ class CliParam:
       print(scrmsg)
     self.ytids = ytstrfs.trans_list_as_uniq_keeping_order_n_mutable(self.ytids)
 
+  @property
+  def langnames(self):
+    lns = []
+    for nsufix in self.sfx_n_2letlng_dict:
+      twolettercode = self.sfx_n_2letlng_dict[nsufix]
+      langname = get_langname(twolettercode)
+      lns.append(langname)
+    return lns
+
   def confirm_cli_args_with_user(self):
     self.confirmed = False
     if not os.path.isdir(self.dirpath):
       scrmsg = f"Source directory [{self.dirpath}] does not exist. Please, retry."
       print(scrmsg)
       return
-    sfx_n_2letlng_dict = self.verify_n_trans_sfx_n_2letlng_dict()
-    charrule = '=' * 20
+    charrule = '=' * 27
     print(charrule)
     print('Input parameters entered')
     print(charrule)
     ytids = self.ytids
     total = len(ytids)
+    amn = self.audiomainnumber
+    voc = self.videoonlycode
+    aocs = self.audioonlycodes
     scrmsg = f"""
     => ytids = {ytids} | total = {total} | sequential sufix for the 'vd' namemarker = {self.nvdseq} 
     -------------------
     => dirpath = [{self.dirpath}]
     (confer default subdirectory "{default_videodld_tmpdir}" or other)
     -------------------
-    => videoonlycode = {self.videoonlycode} | audiomainnumber = {self.audiomainnumber}
-    => sfx_n_2letlng_dict = {self.sfx_n_2letlng_dict}
+    => videoonlycode = {voc} | audiomainnumber = {amn} | audioonlycodes = {aocs}
+    => sfx_n_2letlng_dict = {self.sfx_n_2letlng_dict} | langnames = {self.langnames}
     """
     print(scrmsg)
     print(charrule)
