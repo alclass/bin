@@ -2,9 +2,9 @@
 """
 ~/bin/localuserpylib/ytfunctions/cliparams_for_utubewhendub.py
 
-This module contain class CliParam (used for script ~/bin/dlYouTubeWhenThereAreDubbed.py)
-
-This class helps collect, verify and confirm the CLI parameters for the above-mentioned script.
+This module contain class CliParam which helps collect, verify
+  and confirm the CLI input parameters for script
+  ~/bin/dlYouTubeWhenThereAreDubbed.py.
 """
 import argparse
 import os
@@ -13,7 +13,7 @@ import localuserpylib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
 DEFAULT_YTIDS_FILENAME = ose.DEFAULT_YTIDS_FILENAME
 DEFAULT_AUDIOVIDEO_CODE = ose.DEFAULT_AUDIOVIDEO_CODE
 DEFAULT_AUDIOVIDEO_DOT_EXT = ose.DEFAULT_AUDIOVIDEO_DOT_EXT
-DEFAULT_AUDIO_MAIN_NUMBER = ose.DEFAULT_AUDIO_MAIN_NUMBER
+DEFAULT_AUDIO_MAIN_NUMBER = ose.DEFAULT_AUDIO_MAIN_NUMBER  # may be -1 meaning no audio separate
 DEFAULT_SFX_W_2LETLNG_MAPDCT = ose.DEFAULT_SFX_W_2LETLNG_MAPDCT
 DEFAULT_VIDEO_ONLY_CODE = ose.DEFAULT_VIDEO_ONLY_CODE
 VIDEO_DOT_EXTENSIONS = ose.VIDEO_DOT_EXTENSIONS
@@ -128,6 +128,8 @@ class CliParam:
     # default to the current working directory if none is given
     self.dirpath = args.dirpath or os.path.abspath(".")
     self.videoonlycode = args.voc or None
+    # if audiomainnumber is None, it will get -1 meaning the formatcode in voc is already a+v
+    # i.e., the video comes whole, no merging of a+v (audio with video)
     self.audiomainnumber = args.amn or DEFAULT_AUDIO_MAIN_NUMBER
     self.nvdseq = args.seq or 1
     self.sfx_n_2letlng_dict = args.map or DEFAULT_SFX_W_2LETLNG_MAPDCT

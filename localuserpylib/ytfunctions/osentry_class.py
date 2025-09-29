@@ -14,7 +14,7 @@ import localuserpylib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
 DEFAULT_YTIDS_FILENAME = 'youtube-ids.txt'
 DEFAULT_AUDIOVIDEO_CODE = 160  # previously it was 602, both are 256x144 but 602 has become "more available..."
 DEFAULT_AUDIOVIDEO_DOT_EXT = '.mp4'
-DEFAULT_AUDIO_MAIN_NUMBER = 249
+DEFAULT_AUDIO_MAIN_NUMBER = -1   # formerly 249 (webm), -1 means the formatcode in voc is already a video+audio complete
 DEFAULT_VIDEO_ONLY_CODE = 160
 DEFAULT_SFX_W_2LETLNG_MAPDCT = {0: 'en', 1: 'pt'}  # en is English, pt is Portuguese
 VIDEO_DOT_EXTENSIONS = ['.mp4', '.mkv', '.webm', '.m4v', '.avi', '.wmv']
@@ -23,8 +23,9 @@ default_videodld_tmpdir = 'videodld_tmpdir'
 
 class OSEntry:
   """
-  This class organizes the OSEntries (files and folders) needed for the Downloader class below
-  This class is used by composition by the latter
+  This class organizes the OSEntries (files and folders) needed for the Downloader class.
+    (At the time of writing, this class is located in ~/bin/dlYouTubeWhenThereAreDubbed.py)
+    OSEntry is used by composition in Downloader.
   """
 
   video_dot_extensions = VIDEO_DOT_EXTENSIONS
@@ -65,10 +66,15 @@ class OSEntry:
   def dot_ext(self, _dot_ext):
     """
     The need for this property-setter is because the following:
-      1 - the dot extension may change along program execution: example: from mp4 to mkv (@see more info below)
-      2 - however, the vf (videoformat) dot extension is set once and does not change along program execution
+      1 - the dot extension may change along program execution:
+          example: from mp4 to mkv (@see more info below)
+      2 - in any case, the first vf (videoformat) dot extension is set once
+          and does not change along program execution
+          noting:
+            - if it got mp4 for the videoonly, it'll continue mp4 until the end of execution
+            - if it's webm for the videoonly, it'll continue to be webm idem
 
-    If an extension without its preceding dot is given, a dot will be prepended to it
+    If an extension without its preceding dot is given as input, a dot will be prepended to it
     """
     if isinstance(_dot_ext, str) and not _dot_ext.startswith('.'):
       _dot_ext = '.' + _dot_ext
@@ -96,13 +102,20 @@ class OSEntry:
   @name.setter
   def name(self, pname):
     """
+    This property sets two attributes, they are:
+      1 - prename
+      2 - ytid
+    Recomposing, name = f'{prename} [{ytid}]'
+
+    More Explanation
+    ================
     name is the filename's part without its dot_extension
     name is also composed as:
       "{self.prename} {ytid_with_squarebrackets}"
       Noticing:
-        1 - prename can be any NTFS valid name (if ext4, name gets a bit ampler)
-        2 - a blank-space separated prename from ytid_with_squarebrackets
-        3 - ytid is an 11-char ENC64 string
+        1 - prename can be any NTFS valid name (if ext4, "name space" gets a bit ampler)
+        2 - followed by a blank-space separating `prename` from `ytid_with_squarebrackets`
+        3 - followed by a ytid, which is an 11-char ENC64 string, within square bracks
     """
     raise_value_error = False
     reasons = []
@@ -138,7 +151,7 @@ class OSEntry:
       raise ValueError(errmsg)
 
   @property
-  def basefilename(self):
+  def basefilename(self) -> str:
     """
     basefilename is a filename that is composed as:
       "{name}{dot_extension}"
@@ -147,8 +160,20 @@ class OSEntry:
     _basefilename = f"{self.name}{self.dot_ext}"
     return _basefilename
 
+  def has_basefilename_been_found(self) -> bool:
+    """
+    Returns true if self.name is not None
+
+    Important:
+      The client-caller must not issue this method if basefilename is subject to getting renamed
+        during program execution
+    """
+    if self.name is not None:
+      return True
+    return False
+
   @basefilename.setter
-  def basefilename(self, filename):
+  def basefilename(self, filename: str | None):
     """
     basefilename is a filename that is composed as:
       "{name}{dot_extension}"
@@ -338,7 +363,7 @@ class OSEntry:
       1 - if the original canonical exists, do nothing, return
       2 - look up a canonical name joint with a different extension
       3 - if it finds that canonical with a different extension, set that extension
-          (remind the canonical filename is formed joining the two parts ({name}{dot_ext))
+          (remind the canonical filename is formed joining the two parts ({name}{dot_ext})
     """
     # step 1 - if the original canonical exists, do nothing, return
     if os.path.isfile(self.fp_for_fn_as_name_ext):
@@ -355,6 +380,33 @@ class OSEntry:
     scrmsg = f"\tNot found a CHANGED dot_ext for canonical = {self.fn_as_name_ext}"
     print(scrmsg)
     return False
+
+  def rename_canofile_with_twolettercode_n_nvdseq(self, twolettercode, seq=1, ntries=1):
+    canofilepath = self.fp_for_fn_as_name_ext
+    if not os.path.isfile(canofilepath):
+      wrnmsg = f"canofilepath {canofilepath} does not exist. Returning."
+      print(wrnmsg)
+      # nothing to do, return
+      return False
+    canofilename = self.fn_as_name_ext
+    if ntries > 10:
+      errmsg = f"Error: more than 10 attempts (={ntries}) to rename canofile {canofilename}"
+      raise OSError(errmsg)
+    if twolettercode is None:
+      twolettercode = 'un'
+    prefix = f"vd{seq}-{twolettercode} "
+    newfilename = prefix + canofilename
+    newfilepath = os.path.join(self.workdir_abspath, newfilename)
+    if os.path.isfile(newfilename):
+      return self.rename_canofile_with_twolettercode_n_nvdseq(twolettercode, seq, ntries+1)
+    # rename
+    os.rename(canofilepath, newfilepath)
+    scrmsg = f"""Renamed:
+    FROM: [{canofilename}]
+    TO:   [{newfilename}]  
+    in: [{self.workdir_abspath}]"""
+    print(scrmsg)
+    return True
 
   def rename_canofile_to_next_available_lang_n_prefixed_or_raise(self):
     """

@@ -40,16 +40,8 @@ Syntax:
     [--useinputfile]
     [--voc <video-only-code-number>]
     [--amn <audio-main-number>]
-    [--map <dictionary-map-informing-sufixes-and-their-2-letter-language-codes>]
+    [--map <mapdict|dictionary-map-informing-sufixes-and-their-2-letter-language-codes>]
     [--seq <sequence-number-for-token-vdN-2letter>]
-
-Older syntax (no longer valid):
-  $dlYouTubeWhenThereAreDubbed.py [--ytid <ytid or yturl within "">]
-    [--dirpath "<dirpath>"]
-    [--useinputfile]
-    [--videoonlycode <video-format-number>]
-    --audioonlycodes <list of audio-format-codes>
-    [--nvdseq <sequence-number-for-token-vdN-2letter>]
 
 Where:
   <ytid> => the ENCODE64 11-character YouTube video id
@@ -59,20 +51,39 @@ Where:
            in a file named youtube-ids.txt in the working directory and ignores --ytid
   <video-format-number> => an integer representing the video-only-format
     default: this parameter defaults to 160 (a video-only-code having 256x144 resolution)
-  <list of audio-format-codes> => a list of all audio-only-codes desired for the yt-dlp downloads
+  <audiomainnumber> => the number of the audio-only-code with its dash-sufix-number
+  <mapdict> => a dict mapping the dash-sufix-number with its corresponding two-letter-language-code (@see examples)
   <dirpath> is the absolute directory path from where the default download subdirectory resides
     obs: the download directory is a prenamed subdirectory inside <dirpath>
   <dictionary-map-informing-sufixes-and-their-2-letter-language-codes> => see the examples (above and below)
   <sequence-number-for-token-vdN-2letter> => a sequence number to be appended to "token" vd (example: seq=1 -> "vd1-en")
 
+Older syntax (no longer valid):
+  $dlYouTubeWhenThereAreDubbed.py [--ytid <ytid or yturl within "">]
+    [--dirpath "<dirpath>"]
+    [--useinputfile]
+    [--videoonlycode <video-format-number>]
+    --audioonlycodes <list of audio-format-codes>
+    [--nvdseq <sequence-number-for-token-vdN-2letter>]
+
 Example:
 ========
-  $dlYouTubeWhenThereAreDubbed.py --ytid abcABC123-_
-    --amn 233 -- --map "0:en,1:pt"
 
-The above example 'automatizes' the following two yt-dlp downloads:
+  1 - using audioparts (when an audio-only file is merged with a video-only file)
+    $dlYouTubeWhenThereAreDubbed.py --ytid abcABC123-_
+      --amn 233 -- --map "0:en,1:pt"
+
+  2 - without audioparts (when the download file is already a+v merged)
+    $dlYouTubeWhenThereAreDubbed.py --ytid abcABC123-_
+      --voc 91 --amn -1 --map "0:en,1:pt"
+
+The first example 'automatizes' the following two yt-dlp downloads:
   $yt-dlp -w -f 160+233-0 abcABC123-_
   $yt-dlp -w -f 160+233-1 abcABC123-_
+
+The second example 'automatizes' the following two yt-dlp downloads:
+  $yt-dlp -w -f 91-0 abcABC123-_
+  $yt-dlp -w -f 91-1 abcABC123-_
 
 Notice:
  1 - yt-dlp doesn't know about the two-letter-codes 'en' & 'pt', these are used later on for file renaming.
@@ -230,7 +241,7 @@ OSEntry = ose.OSEntry
 # DEFAULT_AUDIOVIDEO_CODE = ose.DEFAULT_AUDIOVIDEO_CODE
 # DEFAULT_AUDIOVIDEO_DOT_EXT = ose.DEFAULT_AUDIOVIDEO_DOT_EXT
 DEFAULT_YTIDS_FILENAME = ose.DEFAULT_YTIDS_FILENAME
-DEFAULT_AUDIO_MAIN_NUMBER = ose.DEFAULT_AUDIO_MAIN_NUMBER
+DEFAULT_AUDIO_MAIN_NUMBER = ose.DEFAULT_AUDIO_MAIN_NUMBER  # may be -1 meaning no audio separate
 DEFAULT_SFX_W_2LETLNG_MAPDCT = ose.DEFAULT_SFX_W_2LETLNG_MAPDCT
 DEFAULT_VIDEO_ONLY_CODE = ose.DEFAULT_VIDEO_ONLY_CODE
 VIDEO_DOT_EXTENSIONS = ose.VIDEO_DOT_EXTENSIONS
@@ -266,12 +277,15 @@ class Downloader:
     self.dlddir_abspath = dlddir_abspath
     self.treat_dlddir_abspath()
     self.videoonlycode = videoonlycode or DEFAULT_VIDEO_ONLY_CODE
+    # if audiomainnumber is None, it will get -1 meaning the formatcode in voc is already a+v
+    # i.e., the video comes whole, no merging of a+v (audio with video)
     self.audiomainnumber = audiomainnumber or DEFAULT_AUDIO_MAIN_NUMBER  # example: 233, 234, 249 etc
     self.nvdseq = nvdseq or 1
     sfx_n_2letlng_dict = ytstrfs.trans_str_sfx_n_2letlng_map_to_dict_or_raise(sfx_n_2letlng_dict)
     # the langmapper object contains the attributes that help form the audioonlycodes and the filename-rename-tokens
     self.langmapper = ytstrfs.SufixLanguageMapper(sfx_n_2letlng_dict, self.audiomainnumber)
     self.cur_lng_obj = None  # each language is abstracted to a "language object" as each download happens
+    self.last_nsufix_in_case_it_failed = 0
     self.b_verified_once_tmpdir_abspath = None
     # self.prename = None
     self.previously_existing_filenames_in_tmpdir = []
@@ -532,6 +546,8 @@ class Downloader:
     If the second try does not find a file, the third try asks the user which filename
       is the correct one.
     """
+    # if self.osentry.has_basefilename_been_found():
+    #   return
     videofilename_soughtfor = None
     allfilenames = os.listdir(self.osentry.workdir_abspath)
     # dot_ext = self.cur_dot_ext
@@ -978,6 +994,98 @@ class Downloader:
       self.check_if_canonicalname_changed_its_extension()
       self.rename_videofile_after_audiovideofusion()
 
+  @property
+  def vocreplacelist(self):
+    """
+    When audiomainnumber is -1, there is no separate audio & video download
+      because the formatcode is already an a+v whole.
+    In this case, the 'voc' must be appended with the nsufix dash-numbers.
+
+    Example:
+      suppose langdict = [0:'en', 1:'pt']
+      and voc (videoonlycode) is 91
+      then (the result) vocreplacelist = ["91-0", "91-1"]
+    """
+    now_vc = self.videoonlycode
+    nsufices_in_order = self.langmapper.nsufices_in_order
+    vrlist = [f"{now_vc}-{ns}" for ns in nsufices_in_order]
+    return vrlist
+
+  def rename_videocomplete_with_videocode(self, vc, idx):
+    try:
+      nsufix = int(vc.split('-')[-1])
+      twolettercode, langname = self.langmapper.get_twolettercode_n_langname_fr_nsufix(nsufix)
+    except (AttributeError, IndexError):
+      self.last_nsufix_in_case_it_failed += 1
+      nsufix = self.last_nsufix_in_case_it_failed
+      twolettercode = 'un'
+      langname = 'unknown'
+    boolres = self.osentry.rename_canofile_with_twolettercode_n_nvdseq(twolettercode, self.nvdseq)
+    ln = langname
+    tlc = twolettercode
+    happened = "happened" if boolres else "did not happen"
+    scrmsg = f"""{idx} | {happened} rename for langname={ln} nsfx={nsufix} | twolettercode={tlc}
+    workdir = [{self.osentry.workdir_abspath}]
+    canofilename = [{self.osentry.fn_as_name_ext}]"""
+    print(scrmsg)
+
+  def download_as_videowhole(self):
+    """
+    Downloads a video with a formatcode that doesn't need a+v merging.
+    When audiomainnumber is -1, this means the videoonlycode formatcode is already an audio+video formed.
+
+    # 1st-step:
+      get the format-codes for each download (for each language)
+      the videoonlycode (which in this case is already a+v)
+        should be 'dashed' with the language nsufix
+          Example:
+            suppose voc=91 and langdict=[0:'en', 1:'pt']
+            then voc becomes voclist=[91-0, 91-1]
+
+    # 2nd-step:
+      loop over the video-format-codes for each download
+        and prefix-rename each downloaded videofile
+    """
+    got_one = False
+    for idx, vc in enumerate(self.vocreplacelist):
+      strdict = {'ytdlp_fcode_str': vc, 'videourl': self.videourl}
+      comm = self.comm_line_base.format(**strdict)
+      scrmsg = f"@download_video_already_merged | {comm}"
+      print(scrmsg)
+      try:
+        subprocess.run(comm, shell=True, check=True)  # timeout=5 (how long can a download last?)
+        self.discover_dldd_videofilename()
+        self.rename_videocomplete_with_videocode(vc, idx)
+        got_one = True
+      # except subprocess.TimeoutExpired:
+      #     print(f"Command timed out: {comm}")
+      except subprocess.CalledProcessError as e:
+        warnmsg = f"""Command: [{comm}]
+         failed with return code: [{e.returncode}]
+         => {e}"""
+        print(warnmsg)
+        # raise ValueError(errmsg)
+        continue
+      except KeyboardInterrupt:
+        scrmsg = "Interrupted by user. Exiting loop. Continuing."
+        print(scrmsg)
+        continue
+    return got_one
+
+  def prefixdate_n_move_videos_to_parent_dir(self):
+    dext = self.osentry.dot_ext
+    ext = dext.lstrip('.')
+    comm = f"renameDatePrefixBasedOnOSDate.py -y -e={ext}"
+    comm += f"; renameAudioDurationIncluder.py -y -e={ext}"
+    comm += "; renameYtDlpBracketConventionToFormer.py tf -y"
+    scrmsg = f" => Executing command: {comm}"
+    print(scrmsg)
+    os.system(comm)
+    comm = f"mv *{dext} .."
+    scrmsg = f" => Executing command: {comm}"
+    print(scrmsg)
+    os.system(comm)
+
   def process(self):
     """
       1st -> position (cd changedir) at the working tmpdir
@@ -996,6 +1104,8 @@ class Downloader:
     scrmsg = f"""2nd step ->
     DOWNLOAD the {self.videoonlycode} video (ytid={self.ytid})"""
     print(scrmsg)
+    if self.audiomainnumber == -1:
+      return self.download_as_videowhole()
     if not self.download_video_only():
       # at this point, `subprocess` exitted with non-0 (this also means the videoonlyfile did not download)
       # as the next steps depend on this, script cannot continue returning False from here
@@ -1017,6 +1127,7 @@ class Downloader:
     print(scrmsg)
     self.download_audio_complements()
     # move all videos from child_tmpdir_abspath to its parent dir
+    self.prefixdate_n_move_videos_to_parent_dir()
     return True
 
 

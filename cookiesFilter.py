@@ -1,8 +1,22 @@
 #!/usr/bin/env python3
 """
 ~/bin/cookiesFilter.py
+Filters a subset of cookies.json to another file, say, cookies-filtered.json.
 
-domain: ".youtube.com",
+  For the time being, the json search-subset contains the following dict hardcoded:
+    {"domain": ".youtube.com"}
+
+  This means that all elements containing that key-pair will be taken to the output json file.
+  The practical effect is that all cookies from youtube.com will be taken to the output file
+     and those from other domains will not.
+
+  See the following to-do for an addition of an input parameter that a subset-search-json-file
+    may be entered as input to contain the key-value pairs that, in being in cookies.txt,
+    will be transposed to the output cookies-filtered.json.
+
+TODO:
+  1 - establish an input parameter to inform a filename/filepath
+  2 - this filename/filepath is for a jsonfile containing the cookies-search-subset
 """
 import json
 import os
