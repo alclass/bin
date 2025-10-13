@@ -36,6 +36,8 @@ parser.add_argument("--seq", type=int, default=1,
                     help="the sequencial number that accompanies the 'vd' namemarker at the last renaming")
 parser.add_argument("--map", type=str, default="0:en,1:pt",
                     help="the dictionary-mapping with numbers and the 2-letter language codes (e.g. '0:en,1:pt')")
+parser.add_argument("-y", action='store_true',
+                    help="represents 'yes', making the user confirmation phase to be skipped off")
 args = parser.parse_args()
 
 
@@ -83,6 +85,7 @@ class CliParam:
   def __init__(self):
     self.show_docstr_n_do_not_run = False
     self.confirmed = False  # the user may confirm params later on
+    self.goahead_nouserconfirm = False  # the user may confirm params later on
     self.ytid = None  # auxiliary to ytids
     self.ytids = []
     self.b_useinputfile = False
@@ -125,6 +128,7 @@ class CliParam:
     self.ytid = ytstrfs.extract_ytid_from_yturl_or_itself_or_none(self.ytid)
     self.ytids = []  # to be read from file if next parameter is set
     self.b_useinputfile = args.useinputfile
+    self.goahead_nouserconfirm = args.y or False
     # default to the current working directory if none is given
     self.dirpath = args.dirpath or os.path.abspath(".")
     self.videoonlycode = args.voc or None
@@ -158,6 +162,10 @@ class CliParam:
     return lns
 
   def confirm_cli_args_with_user(self):
+    if self.goahead_nouserconfirm:
+      # this means the running process used the '-y' CLI parameter (autoconfirm)
+      self.confirmed = True
+      return
     self.confirmed = False
     if not os.path.isdir(self.dirpath):
       scrmsg = f"Source directory [{self.dirpath}] does not exist. Please, retry."
@@ -172,6 +180,8 @@ class CliParam:
     amn = self.audiomainnumber
     voc = self.videoonlycode
     aocs = self.audioonlycodes
+    langs_in_asc_order = sorted(self.langnames)
+    n_langs = len(langs_in_asc_order)
     scrmsg = f"""
     => ytids = {ytids} | total = {total} | sequential sufix for the 'vd' namemarker = {self.nvdseq} 
     -------------------
@@ -179,7 +189,7 @@ class CliParam:
     (confer default subdirectory "{default_videodld_tmpdir}" or other)
     -------------------
     => videoonlycode = {voc} | audiomainnumber = {amn} | audioonlycodes = {aocs}
-    => sfx_n_2letlng_dict = {self.sfx_n_2letlng_dict} | langnames = {self.langnames}
+    => sfx_n_2letlng_dict = {self.sfx_n_2letlng_dict} | langnames = {langs_in_asc_order} | n_langs = {n_langs}
     """
     print(scrmsg)
     print(charrule)

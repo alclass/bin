@@ -22,6 +22,7 @@ cmpld_ytid_instr_af_equalsign_pattern = re.compile(ytid_instr_af_equalsign)
 # but the ytid will generalized as a split('/')[-1] and then tested as an 11-char ENC64 str
 ytvideobaseurl = "https://www.youtube.com/watch?v="
 TWOLETTER_N_LANGUAGENAME_DICTMAP = {
+  'ar': 'Arabic',
   'de': 'German',
   'en': 'English',
   'es': 'Spanish',
@@ -29,10 +30,14 @@ TWOLETTER_N_LANGUAGENAME_DICTMAP = {
   'hi': 'Hindi',
   'id': 'Indonesian',
   'it': 'Italian',
-  'ja': 'Japaneses',
+  'ja': 'Japanese',
+  'ma': 'Mandarin Chinese',
+  'ml': 'Malaysian',
   'po': 'Polish',
   'pt': 'Portuguese',
+  'ro': 'Romanian',
   'ru': 'Russian',
+  'uk': 'Ukrainian',
 }
 
 
@@ -233,8 +238,15 @@ def trans_list_as_uniq_keeping_order_n_mutable(ytids):
 
 def trans_str_sfx_n_2letlng_map_to_dict_or_raise(pdict):
   """
-  This function is called for help instance SufixLangMapper
-  and also from "outside" script dlYouTubeWhenThereAreDubbed
+  Transforms a string represent a number-and-twoletterlanguagecode map into a dict, noting:
+  1 - the elements (key and value) in the incoming string, do not need to be enclosed within simple or double quotes
+    1 - 1 if it has quotes, no problem, they are stripped off for its dict conversion
+  2 - the outgoing dict has an int key (the language index or sufix [its semantic is considered here])
+    and a string value (which is the twoletterlanguagecode)
+
+  Initially written for:
+    1 - script dlYouTubeWhenThereAreDubbed that contains this dict in question as an input parameter
+    2 - the output dict will serve to instantiate a SufixLangMapper mapper object
   """
   if isinstance(pdict, dict):
     return pdict
@@ -242,18 +254,22 @@ def trans_str_sfx_n_2letlng_map_to_dict_or_raise(pdict):
   pp = pdict.split(',')
   for elem in pp:
     try:
+      if elem.find(':') < 0:
+        continue
       pair = elem.split(':')
-      pair0 = pair[0].strip(' \t\r\n')
+      pair0 = pair[0].strip(' \t\r\n"\'')
       number = int(pair0)
       twolettercode = pair[1]
-      twolettercode = twolettercode.strip(' \t\r\n')
-      outdict.update({number: twolettercode})
+      twolettercode = twolettercode.strip(' \t\r\n"\'')
       if len(twolettercode) != 2:
-        errmsg = f"Error: a twolettercode should have 2 letter, it has {len(twolettercode)} in {pdict}"
-        raise ValueError(errmsg)
+        wrnmsg = f"Warning: a twolettercode should have 2 letter, it has {len(twolettercode)} in {pdict}"
+        print(wrnmsg)
+        continue
+      outdict.update({number: twolettercode})
     except (IndexError, ValueError) as e:
-      errmsg = f"Error: sfx_n_2letlng_dict is malformed {pdict} | {e}"
-      raise ValueError(errmsg)
+      wrnmsg = f"Error: sfx_n_2letlng_dict is malformed with elem [{elem}] in strdict [{pdict}] | {e}"
+      print(wrnmsg)
+      continue
   return outdict
 
 
