@@ -27,7 +27,7 @@ import re
 # import shutil
 # import subprocess
 # import sys
-# import localuserpylib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
+import localuserpylib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
 # import localuserpylib.regexfs.filenamevalidator_cls as fnval  # .FilenameValidator
 import localuserpylib.ytfunctions.osentry_class as ose  # ose.OSEntry
 # import localuserpylib.ytfunctions.cliparams_for_utubewhendub as clip  # clip.CliParam
@@ -102,6 +102,7 @@ class VideoNameAttr:
     videoformat_fn = f"{self.ytid}.txt"
     _ = open(videoformat_fn).read()
     # the idea is to instropect read filetext so that autodubbed codes are found or not
+    langdict = ytstrfs.fetch_langdict_w_videoformatoutput()
     return False
 
   def __str__(self):
