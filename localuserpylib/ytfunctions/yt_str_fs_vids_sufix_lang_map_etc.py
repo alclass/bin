@@ -691,7 +691,8 @@ def fetch_langdict_w_videoformatoutput(videoformatoutput):
   :param videoformatoutput:
   :return:
   """
-  return ytlang.fetch_langdict_w_videoformatoutput(videoformatoutput)
+
+  return {}
 
 
 def adhoctest6():

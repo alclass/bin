@@ -5,6 +5,8 @@ Contains functions related to YouTube's video formats.
 """
 import os.path
 import re
+import localuserpylib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytfs
+
 # import sys
 TWOLETTER_N_LANGUAGENAME_DICTMAP = {
   'ar': 'Arabic',
@@ -28,23 +30,49 @@ INTEREST_LANGUAGES = ['de', 'fr', 'en', 'es', 'it', 'ru']
 twoletterlangcodes = list(TWOLETTER_N_LANGUAGENAME_DICTMAP.keys())
 barred_twoletterlangcodes = '|'.join(twoletterlangcodes)
 # restr_2lttcds = r'\[' + barred_twoletterlangcodes + r'\]+'
-restr_2lttcds = r'^.*?\[([a-z]{2})\].*$'
+restr_2lttcds = r'^.*?\[(?P<twoletlngcod>[a-z]{2})\].*$'
 recmp_2lttcds = re.compile(restr_2lttcds)
 
 
 class YTVFTextExtractor:
   """
   YTVFTextExtractor = YouTube Video Format Text Extractor
-  :return:
+
+  Models video's audiovideocodes and its related characterists,
+    the two main ones are:
+    a) whether video is a+v-merged or not,
+    b) whether it has autodubbed languages or not
+
+  Once these attributes are known, the appropriate enveloppable download
+  yt-dlp command may be formed.
+
+  The main application of this class is in the script for recuperating
+  left-overs that are incomplete downloads (in general, they are video-only files).
   """
+
   def __init__(self, videoformatouput: str):
-    self.videoformatouput = videoformatouput
     self.langdict = {}
+    self.ytid = None
     self.videocode = None
     self.audiocode = None
+    self.videoformatouput = videoformatouput or ''
     self.lines: list = self.videoformatouput.split('\n')
     self.video_is_dubbed = False
     self.video_is_avmerged = False
+    self.process()
+
+  def extract_ytid_from_top(self):
+    self.ytid = None
+    pattern_str = "[youtube] Extracting URL:"
+    for line in self.lines:
+      pos = line.find(pattern_str)
+      if pos > -1:  #
+        piece = line[len("[youtube] Extracting URL:"):]
+        # there should be an ytid at the end of the string
+        _ytid = piece[-11:]
+        if ytfs.is_str_a_ytid(_ytid):
+          self.ytid = _ytid
+          break
 
   def find_languages_knowing_audiocode(self):
     """
@@ -54,20 +82,20 @@ class YTVFTextExtractor:
     """
     if self.video_is_dubbed:
       if self.video_is_avmerged:
-        for i in range(30):
-          strdashed = f"{self.audiocode}-{i}"
-          pos = self.videoformatouput.find(strdashed)
-          if pos > -1:
-            print(strdashed, 'found at pos', pos)
-            trunk = self.videoformatouput[pos: pos+150]
-            line = trunk.split('\n')[0]
-            mo = recmp_2lttcds.match(line)
-            twoletter = None
-            if mo:
-              twoletter = mo.group(1)
-              print('found 2letter', twoletter)
-            if twoletter in INTEREST_LANGUAGES:
-              self.langdict[i] = twoletter
+        for i in range(30):  # 30 is estimated the max number of languages
+          lines = self.videoformatouput.split('\n')
+          for line in lines:
+            strdashed = f"{self.audiocode}-{i}"  # check if this dashed exists
+            pos = line.find(strdashed)
+            if pos > -1:
+              print(strdashed, 'found at pos', pos)
+              mo = recmp_2lttcds.match(line)
+              twoletter = None
+              if mo:
+                twoletter = mo.group('twoletlngcod')
+                print('found 2letter', twoletter)
+              if twoletter in INTEREST_LANGUAGES:
+                self.langdict[i] = twoletter
 
   def find_audio_formats_or_the_smaller_video(self):
     """
@@ -143,8 +171,24 @@ class YTVFTextExtractor:
         twoletter = match_o.group(1)
         print(twoletter)
 
+  def mount_comm(self):
+    if self.video_is_dubbed:
+      audiocode = self.audiocode if self.video_is_avmerged else '-1'
+      comm = f"dlYouTubeWhenThereAreDubbed.py --ytid {self.ytid}"
+      comm += f" --voc {self.videocode} --amn {audiocode} --seq 1"
+      comm += ' --map "0:en,1:pt"'
+      return comm
+    comm = f"yt-dlp -w -f {self.composedcode} {self.ytid}"
+    return comm
+
+  def process(self):
+    self.extract_ytid_from_top()
+    self.find_audio_formats_or_the_smaller_video()
+    self.find_languages_knowing_audiocode()
+
   def __str__(self):
     outstr = f"""{self.__class__.__name__}
+    ytid = {self.ytid}
     videocode = {self.videocode}
     audiocode = {self.audiocode}
     video_is_dubbed = {self.video_is_dubbed}
@@ -166,10 +210,8 @@ def adhoctest2():
   fp = os.path.join(dp, fn)
   text = open(fp).read()
   extractor = YTVFTextExtractor(text)
-  extractor.find_audio_formats_or_the_smaller_video()
   print(extractor)
-  extractor.find_languages_knowing_audiocode()
-  print(extractor.langdict)
+  print('langdict', extractor.langdict)
 
 
 def adhoctest1():
