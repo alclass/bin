@@ -10,7 +10,6 @@ from typing import Any
 import os
 import string
 import re
-import localuserpylib.ytfunctions.yt_videoformat_fs as ytvf
 YTID_CHARSIZE = 11
 enc64_valid_chars = string.digits + string.ascii_lowercase + string.ascii_uppercase + '_-'
 # Example for the regexp below: https://www.youtube.com/watch?v=abcABC123_-&pp=continuation
@@ -23,7 +22,24 @@ cmpld_ytid_instr_af_equalsign_pattern = re.compile(ytid_instr_af_equalsign)
 # another pattern to extract a ytid is the following: https://www.youtube.com/shorts/<ytid>
 # but the ytid will generalized as a split('/')[-1] and then tested as an 11-char ENC64 str
 ytvideobaseurl = "https://www.youtube.com/watch?v="
-TWOLETTER_N_LANGUAGENAME_DICTMAP = ytvf.TWOLETTER_N_LANGUAGENAME_DICTMAP
+TWOLETTER_N_LANGUAGENAME_DICTMAP = {
+  'ar': 'Arabic',
+  'de': 'German',
+  'en': 'English',
+  'es': 'Spanish',
+  'fr': 'French',
+  'hi': 'Hindi',
+  'id': 'Indonesian',
+  'it': 'Italian',
+  'ja': 'Japanese',
+  'ma': 'Mandarin Chinese',
+  'ml': 'Malaysian',
+  'po': 'Polish',
+  'pt': 'Portuguese',
+  'ro': 'Romanian',
+  'ru': 'Russian',
+  'uk': 'Ukrainian',
+}
 
 
 def is_str_enc64(line: str | None) -> bool:
