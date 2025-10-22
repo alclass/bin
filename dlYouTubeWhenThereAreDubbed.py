@@ -2,6 +2,13 @@
 """
 ~/bin/dlYouTubeWhenThereAreDubbed.py
 
+Obs:
+  a) this script is currently located in the 'bin' repo
+     and, inside $PATH, can be run everywhere in the system
+  b) at some future moment (when DirTree becomes a pipx install),
+     it will be moved to the DirTree repo. DirTree as a pipx install
+     will also be availbable anywhere in the system.
+
 This script uses (underlying) yt-dlp to download (from YouTube) a video
   in two or more languages.
 
@@ -1054,7 +1061,8 @@ class Downloader:
       print(scrmsg)
       try:
         subprocess.run(comm, shell=True, check=True)  # timeout=5 (how long can a download last?)
-        self.discover_dldd_videofilename()
+        # the name should be the "canonical", no discovery is necessary
+        # self.discover_dldd_videofilename()
         self.rename_videocomplete_with_videocode(vc, idx)
         got_one = True
       # except subprocess.TimeoutExpired:

@@ -395,6 +395,8 @@ class OSEntry:
     if twolettercode is None:
       twolettercode = 'un'
     prefix = f"vd{seq}-{twolettercode} "
+    if ntries > 1:
+      prefix = f"vd{seq}-{ntries}-{twolettercode} "
     newfilename = prefix + canofilename
     newfilepath = os.path.join(self.workdir_abspath, newfilename)
     if os.path.isfile(newfilename):
