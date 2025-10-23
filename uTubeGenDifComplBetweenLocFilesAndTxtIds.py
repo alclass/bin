@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-__doc__ = '''
+"""
 ===== Help Screen =====
 This script does:
 
@@ -15,7 +15,7 @@ This script does:
 
 Obs: this print-out result may be redirected (with the ">" symbol) to a shell-script-file to be manually cleaned up and executed later one.
 ==================================
-'''
+"""
 import os
 import string
 import sys
