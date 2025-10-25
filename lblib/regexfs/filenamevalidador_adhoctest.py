@@ -2,7 +2,7 @@
 """
 ~/bin/localuserpylib/regexfs/filenamevalidator_cls.py
 """
-import localuserpylib.regexfs.filenamevalidator_cls as fnval
+import lblib.regexfs.filenamevalidator_cls as fnval
 
 
 def adhoctest1():

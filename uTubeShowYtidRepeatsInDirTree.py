@@ -14,7 +14,7 @@ The first application (a kind of extended one) of this script was to help find
 import argparse
 import os.path
 import sys
-import localuserpylib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytfs  # ytfs.is_str_a_ytid()
+import lblib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytfs  # ytfs.is_str_a_ytid()
 parser = argparse.ArgumentParser(description="Show ytid stats in a folder or dirtree.")
 parser.add_argument("--docstr", action="store_true",
                     help="show docstr help and exit")

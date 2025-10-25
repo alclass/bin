@@ -29,7 +29,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 import math
 import os
-import localuserpylib.pydates.refmonths_mod as rmfs  # .make_refmonthdate_or_current
+import lblib.pydates.refmonths_mod as rmfs  # .make_refmonthdate_or_current
 parser = argparse.ArgumentParser(description="Compare and report ytid differences in-between dirtrees.")
 parser.add_argument("--refmi", type=str,
                     help="initial refmonth for downloading")

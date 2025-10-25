@@ -8,8 +8,8 @@ This module contain class CliParam which helps collect, verify
 """
 import argparse
 import os
-import localuserpylib.ytfunctions.osentry_class as ose  # ose.OSEntry
-import localuserpylib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
+import lblib.ytfunctions.osentry_class as ose  # ose.OSEntry
+import lblib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
 DEFAULT_YTIDS_FILENAME = ose.DEFAULT_YTIDS_FILENAME
 DEFAULT_AUDIOVIDEO_CODE = ose.DEFAULT_AUDIOVIDEO_CODE
 DEFAULT_AUDIOVIDEO_DOT_EXT = ose.DEFAULT_AUDIOVIDEO_DOT_EXT

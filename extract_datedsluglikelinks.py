@@ -5,7 +5,7 @@
 localuserpylib.pydates.localpydates.gen_last_n_monday_dates_from_date
 """
 import os, re, sys
-import localuserpylib.pydates.localpydates as dtfs  # .gen_last_n_monday_dates_from_date
+import lblib.pydates.localpydates as dtfs  # .gen_last_n_monday_dates_from_date
 
 lines = '''
 https://noticias.uol.com.br/newsletters?investimentos

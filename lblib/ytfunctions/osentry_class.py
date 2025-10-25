@@ -9,8 +9,8 @@ This class is used by dlYouTubeWhenThereAreDubbed.py that, at the time of writin
 """
 import os
 import sys
-import localuserpylib.regexfs.filenamevalidator_cls as fnval  # .FilenameValidator
-import localuserpylib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
+import lblib.regexfs.filenamevalidator_cls as fnval  # .FilenameValidator
+import lblib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
 DEFAULT_YTIDS_FILENAME = 'youtube-ids.txt'
 DEFAULT_AUDIOVIDEO_CODE = 160  # previously it was 602, both are 256x144 but 602 has become "more available..."
 DEFAULT_AUDIOVIDEO_DOT_EXT = '.mp4'

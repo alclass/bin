@@ -1,112 +1,111 @@
 #!/usr/bin/env python3
 """
 ~bin/uTubeGenVideoFormatsAndExtractThem.py
+  This is a dispatcher script relaying executing to:
+    /home/dados/Sw3/PrdPrjSw/DirTreeMirror_PrdPrjSw/cmm/yt/uTubeGenVideoFormatsAndExtractThem.py
 
-/home/dados/Sw3/PrdPrjSw/DirTreeMirror_PrdPrjSw/cmm/yt/uTubeGenVideoFormatsAndExtractThem.py
-/home/dados/Sw3/PrdPrjSw/DirTreeMirror_PrdPrjSw/cmm/yt/uTubeGenVideoFormatsAndExtractThem.py
-/home/dados/Sw3/PrdPrjSw/DirTreeMirror_PrdPrjSw
-/home/friend/bin/uTubeGenVideoFormatsAndExtractThem.py
+This destination script was written under a virtual-env, but it itself does not have
+  dependencies on its local site-packages. Because of that, relaying just need to execute it
+  and send it its CLI-parameters.
 
-cmm/yt/uTubeGenVideoFormatsAndExtractThem.py
+However, this destination script does need the local imports in its app. Because of this,
+  it adds (manually) the root-app-dir into sys.path (@see it there).
 
+Just as a reminder for the future, the json idea below will be carried on
+  for the rename-scripts (*) strategy in the future.
+    import json
+    CONFIG_FILE = Path.home() / ".dispatcher_config.json"
 
-import json
-CONFIG_FILE = Path.home() / ".dispatcher_config.json"
+ (*) the rename-scripts are about 20 in number and they might be executed, instead of one for each one,
+   by a command subcommand strategy. For example:
+   1 - the renameCleanBegining.py <params> might become:
+     => rendsp cleanBeginning <params>
+   2 - the renameReplace12.py <params> might become:
+     => rendsp replace12 <params>
+
 """
-import os
 import sys
 import subprocess
 from pathlib import Path
 import bin_local_settings as bls
+import lblib.os.dispatch_diretor as dd
+
 
 class Director:
-  this_scr_filepath = __file__
-  this_scr_filename = os.path.split(this_scr_filepath)[1]
-  targetapp_rootpath = Path(bls.PYMIRROAPP_PATH)
-  # relpath_to_foward_script = 'cmm/yt'
-  # venv_bin_relpath = 'venv/bin'
-  # trgscript = root_targetpath / relpath_to_foward_script / this_script_name
-  # trgscript_relpath = relpath_to_foward_script + '/' + this_script_name
-  # venvs_pyexecutable_path = root_targetpath / venv_bin_relpath / 'python'
-  # venvs_pyexecutable_relpath = 'venv/bin/python'
-  venv_sourcing_comm = 'source venv/bin/python'
-  
-  script_args = sys.argv[1:]
-
-
-def dispatch_to_its_env():
-  if not venvs_pyexecutable_path.exists():
-    print(f"Error: Virtual environment not found at {venvs_pyexecutable_path}")
-    sys.exit(1)
-  if not trgscript.exists():
-    print(f"Error: Virtual environment not found at {trgscript}")
-    sys.exit(1)
-  # Build and execute command
-  # sys.path.insert(0, root_targetpath)
-  _ = root_targetpath
-  print('chdir to', root_targetpath)
-  os.chdir(root_targetpath)
-  curdir = os.curdir
-  ap = os.path.abspath(curdir)
-  sourcecomm = 'source venv/bin/activate'
-  # subprocess.run([])
-  os.system(sourcecomm)
-  print('curdir', ap)
-  # cmd = [str(venvs_pyexecutable_relpath), str(trgscript_relpath)] + script_args
-  cmd = [str(trgscript_relpath)] + script_args
-  print('cmd', cmd)
-  os.system(str(trgscript_relpath))
-
-
-def later():
-  try:
-    subprocess.run(cmd, check=True)
-  except subprocess.CalledProcessError as e:
-    sys.exit(e.returncode)
-  except FileNotFoundError:
-    errmsg = f"Error: Python interpreter not found at {root_targetpath}"
-    print(errmsg)
-    sys.exit(1)
-
-def way3():
-  import subprocess
-
-  # Define the multiline script
-  bash_script = f"""
-  #!/bin/bash
-  echo "Starting multiline script..."
-  chdir "{}"
-  
-  ls -l
-  echo "Script finished."
   """
+  These two following lines are only necessary if the app has a local site-packages dependency
+    (which is not the case for this script, its dependency is inward in the app itself)
+    (this 'inward' dependency is solved by a sys.insert in the destination script)
+  ----------------------------------------------
+  relpath_to_venv_bin_python = 'venv/bin/python'
+  python_comm_abspath = targetapp_rootpath / relpath_to_venv_bin_python
 
-  try:
-    # Execute the script.
-    # `shell=True` is used to execute the command through the shell.
-    # `capture_output=True` captures stdout and stderr.
-    # `text=True` decodes stdout and stderr as text.
-    result = subprocess.run(
-      bash_script,
-      shell=True,
-      capture_output=True,
-      text=True,
-      check=True  # Raise an exception for non-zero exit codes
-    )
+  Another point of attention is that 'source' does not work with system-callers
+    (whether it's os.system() or subprocess.run())
+  # venv_sourcing_comm = 'source venv/bin/python'
 
-    print("STDOUT:")
-    print(result.stdout)
-    print("STDERR:")
-    print(result.stderr)
+  """
+  this_scr_filepath = Path(__file__)
+  # the destination script has the same name
+  this_scr_filename = this_scr_filepath.name  # os.path.split(this_scr_filepath)[1]
+  targetapp_rootpath = Path(bls.PYMIRROAPP_PATH)
+  midpath_to_trg_scr = 'cmm/yt'
+  destination_script_abspath = targetapp_rootpath / midpath_to_trg_scr / this_scr_filename
+  script_args: list = sys.argv[1:]  # element-0 is the script's name itself
 
-  except subprocess.CalledProcessError as e:
-    print(f"Error executing script: {e}")
-    print(f"STDOUT: {e.stdout}")
-    print(f"STDERR: {e.stderr}")
+  @classmethod
+  def dispatch_to_destination_script(cls):
+    if not cls.destination_script_abspath.is_file():
+      print(f"Error: destination_script_abspath not found in {cls.destination_script_abspath}")
+      sys.exit(1)
+    try:
+      dest_scr_fp = str(cls.destination_script_abspath)
+      cmd = [dest_scr_fp] + cls.script_args
+      # print(f'Args {cls.script_args}')
+      # print(f'cmd {cmd}')
+      # print('  :: dispatch to command =>', cmd)
+      result = subprocess.run(
+        cmd,  # =cmd,
+        check=True,
+        # shell=True, # if shell is set to True, CLI-parameters are not passed on
+        capture_output=True,
+        text=True,
+      )
+      # Execute the script.
+      # `shell=True` is used to execute the command through the shell.
+      # `capture_output=True` captures stdout and stderr.
+      # `text=True` decodes stdout and stderr as text.
+      print("STDOUT:")
+      print(result.stdout)
+      print("STDERR:")
+      print(result.stderr or "\tNo errors in STDERR.")
+
+    except subprocess.CalledProcessError as e:
+      print(f"Error executing script: {e}")
+      print(f"STDOUT: {e.stdout}")
+      print(f"STDERR: {e.stderr}")
+      sys.exit(e.returncode)
+
+
+def process():
+  Director.dispatch_to_destination_script()
+
+
+def dispatch():
+  fromfile = __file__
+  midpath_to_trg_scr = 'cmm/yt'
+  targetapp_rootpath = bls.PYMIRROAPP_PATH
+  # dispatcher instantiates Director
+  dispatcher = dd.Director(
+    fromfile=fromfile,
+    midpath_to_trg_scr=midpath_to_trg_scr,
+    targetapp_rootpath=targetapp_rootpath
+  )
+  dispatcher.dispatch_to_destination_script()
 
 
 if __name__ == "__main__":
   """
   adhoctest1()
   """
-  dispatch_to_its_env()
+  dispatch()

@@ -240,10 +240,10 @@ import os.path
 import shutil
 import subprocess
 import sys
-import localuserpylib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
-import localuserpylib.regexfs.filenamevalidator_cls as fnval  # .FilenameValidator
-import localuserpylib.ytfunctions.osentry_class as ose  # ose.OSEntry
-import localuserpylib.ytfunctions.cliparams_for_utubewhendub as clip  # clip.CliParam
+import lblib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
+import lblib.regexfs.filenamevalidator_cls as fnval  # .FilenameValidator
+import lblib.ytfunctions.osentry_class as ose  # ose.OSEntry
+import lblib.ytfunctions.cliparams_for_utubewhendub as clip  # clip.CliParam
 OSEntry = ose.OSEntry
 # DEFAULT_AUDIOVIDEO_CODE = ose.DEFAULT_AUDIOVIDEO_CODE
 # DEFAULT_AUDIOVIDEO_DOT_EXT = ose.DEFAULT_AUDIOVIDEO_DOT_EXT
