@@ -99,7 +99,9 @@ def dispatch():
   dispatcher = dd.Director(
     fromfile=fromfile,
     midpath_to_trg_scr=midpath_to_trg_scr,
-    targetapp_rootpath=targetapp_rootpath
+    targetapp_rootpath=targetapp_rootpath,
+    # --dirpath picks up the current working directory because this changes after dispatching
+    current_dir=Path('.').absolute()
   )
   dispatcher.dispatch_to_destination_script()
 

@@ -29,11 +29,21 @@ class Director:
 
   """
 
-  def __init__(self, fromfile, midpath_to_trg_scr, targetapp_rootpath):
+  def __init__(self, fromfile, midpath_to_trg_scr, targetapp_rootpath, current_dir):
     self.this_scr_filepath = Path(fromfile)
     self.midpath_to_trg_scr = midpath_to_trg_scr
     self.targetapp_rootpath = Path(targetapp_rootpath)
+    self.workingdir_abspath = Path(current_dir)
     self.script_args: list = sys.argv[1:]  # element-0 is the script's name itself
+    if '--dirpath' not in self.script_args:
+      self.add_currentpath_to_scriptargs()
+
+  def add_currentpath_to_scriptargs(self):
+    if '--dirpath' not in self.script_args:
+      # some scripts must find out from which dir execution happens
+      self.script_args.append('--dirpath')
+      current_dirpath = Path(self.workingdir_abspath)
+      self.script_args.append(str(current_dirpath))
 
   @property
   def this_scr_filename(self):

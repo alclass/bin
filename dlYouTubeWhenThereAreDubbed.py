@@ -12,6 +12,7 @@ This destination script is under a virtual-env, but it itself does not have
   (*) There is a trick in the destination script for it being capable of
       getting its local imports (@see it there).
 """
+from pathlib import Path
 import bin_local_settings as bls
 import lblib.os.dispatch_diretor as dd
 
@@ -24,7 +25,9 @@ def dispatch():
   dispatcher = dd.Director(
     fromfile=fromfile,
     midpath_to_trg_scr=midpath_to_trg_scr,
-    targetapp_rootpath=targetapp_rootpath
+    targetapp_rootpath=targetapp_rootpath,
+    # --dirpath picks up the current working directory because this changes after dispatching
+    current_dir=Path('.').absolute()
   )
   dispatcher.dispatch_to_destination_script()
 
