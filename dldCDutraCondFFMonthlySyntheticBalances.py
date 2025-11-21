@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-'''
+"""
 dldCDutraCondFFMonthlySyntheticBalances.py
 
 This script download the html-files equivalent to the 
@@ -35,13 +35,13 @@ More info:
 
 2) This script cuts off when attempting to download months earlier
    than a year ago.
-'''
+"""
 import datetime
 from dateutil.relativedelta import relativedelta
 import os
 import sys
 urlBase = 'https://fernandoefernandes.com.br/ffnet_sys/sefudoff.php?cod=0154&period=%(month)02d/%(year)d'
-fnBase = '%(year)d-%(month)02d Balancete Sintetico Cond CDutra.html'
+fnBase = '%(year)d-%(month)02d Balancete Sintetico mensal Cond CDutra.html'
 
 
 def get_last_available_dld_date():
@@ -79,16 +79,17 @@ class CDutraBalanceteDownloader:
     print(' ======== Downloading if missing ========')
     for i, tupl in enumerate(self.year_month_tuplelist):
       year, month = tupl
-      if cdate < self.date_out_of_range:
-        print(cdate,'is not available as date')
+      currdate = datetime.date(year, month, 1)
+      if currdate < self.last_available_dld_date:
+        print(currdate, 'is not available as date')
         continue
-      url = urlBase %{'month':month, 'year':year}
-      filename = fnBase %{'month':month, 'year':year}
+      url = urlBase %{'month': month, 'year': year}
+      filename = fnBase %{'month': month, 'year': year}
       seq = i + 1
       if os.path.isfile(filename):
         print(seq, 'Filename', filename, 'is already in folder.')
         continue
-      comm = 'wget "%s" -O "%s"' %(url, filename)
+      comm = 'wget "%s" -O "%s"' % (url, filename)
       print(seq, '=>', comm)
       os.system(comm)
 
