@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
-renameWithNewNameListingFileAndExt.py
-  This script renames files with a certain extension (@see default value below) in alphabetical order
-    with the names in a text file (whose default filename is also given below)
+~/bin/renameWithNewNameListingFileAndExt.py
+
+  This script renames files under a certain extension (e.g. mp4)
+   (@see default value below) in alphabetical order
+    with the names in a text file
+    (whose default filename is also given below)
 
 Usage:
   $renameWithNewNameListingFileAndExt.py [-e=<fileextension>] [-n="<textfilename>"] [-w="<workdir_abspath>"]
@@ -215,9 +218,21 @@ def process():
   """
   print()
   args_obj = InputArguments()
-  workdir_abspath = args_obj.workdir_abspath
-  new_name_listing_file = args_obj.new_name_listing_file
-  should_be_ext = args_obj.should_be_ext
+  workdir_abspath = None
+  new_name_listing_file = None
+  should_be_ext = None
+  try:
+    workdir_abspath = args_obj.workdir_abspath or None
+  except AttributeError:
+    pass
+  try:
+    new_name_listing_file = args_obj.new_name_listing_file or None
+  except AttributeError:
+    pass
+  try:
+    should_be_ext = args_obj.should_be_ext or None
+  except AttributeError:
+    pass
   renamer = Renamer(workdir_abspath, new_name_listing_file, should_be_ext)
   renamer.process()
 
