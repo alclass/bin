@@ -139,7 +139,7 @@ class Renamer:
 
     :return:
     """
-    print('@process_rename')
+    print('@confirm_renames')
     self.gather_renamepairs_ifany()
     if self.confirm_renames():
       self.rename_pairs()
