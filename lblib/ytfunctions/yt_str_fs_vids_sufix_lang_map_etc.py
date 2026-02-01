@@ -55,6 +55,38 @@ def is_str_a_ytid(ytid: str | None) -> bool:
   return is_str_enc64(ytid)
 
 
+def does_basename_end_with_dash_ytid(anystr: str | None) -> bool:
+  if anystr is None:
+    return False
+  if len(anystr) < YTID_CHARSIZE + 1:  # it accepts the minimun YTID_CHARSIZE + 1 size, i.e., the whole string as sufix
+    return False
+  if anystr[-YTID_CHARSIZE-1] != '-':
+    return False
+  sup_ytid = anystr[-YTID_CHARSIZE:]
+  return is_str_a_ytid(sup_ytid)
+
+
+def does_fn_w_0_or_1_ext_have_a_dash_ytid_sufix(filename: str | None) -> bool:
+  try:
+    basename, _ = os.path.splitext(filename)
+    return does_basename_end_with_dash_ytid(basename)
+  except OSError:
+    pass
+  return False
+
+
+def extract_ytid_from_fn_w_0_or_1_ext_having_dash_ytid_sufix(filename: str | None) -> str | None:
+  if filename is None:
+    return None
+  try:
+    basename, _ = os.path.splitext(filename)
+    if not does_basename_end_with_dash_ytid(basename):
+      return None
+    return basename[-YTID_CHARSIZE:]
+  except OSError:
+    return None
+
+
 def get_match_ytid_af_equalsign_or_itself(line):
   """
   Gets a ytid after an "=" (equal sign) or returns the input itself
@@ -62,6 +94,12 @@ def get_match_ytid_af_equalsign_or_itself(line):
   """
   match = cmpld_ytid_instr_af_equalsign_pattern.search(line)
   return line if match is None else match.group(1)
+
+
+def extract_ytid_in_the_dash_ytid_sufix_case(anystr):
+  if not does_basename_end_with_dash_ytid(anystr):
+    return None
+  return anystr[-11:]
 
 
 def extract_ytid_from_yturl_or_itself_or_none(p_supposed_ytid: str | None) -> str | None:

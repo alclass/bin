@@ -362,10 +362,10 @@ class Rename:
     self.form_rename_pair_based_on_tofiles()
     self.show_renames()
     if self.confirm_before_rename:
-      do_rename = self.confirm_renames()
+      do_rename_if_confirmed = self.confirm_renames()
     else:
-      do_rename = True
-    if do_rename:
+      do_rename_if_confirmed = True
+    if do_rename_if_confirmed:
       self.do_rename_pairs()
 
     :param self:

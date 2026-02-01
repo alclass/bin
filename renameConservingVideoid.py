@@ -1,21 +1,50 @@
 #!/usr/bin/env python3
 """
+~/bin/renameConservingVideoid.py
+  Renames files conserving the videoid (already in the dirfiles) and dot-extension suffix
+    using as new names those in an input file and confirming alphanumerical ordering.
+
+Limitation:
+  This script only works with one extension at time.
+
+Cause:
+  The renamings with this script can be undone. Use it with care.
+
+Important:
+  Care must also be taken in another sense. The new filenames will 'prepend', so to say,
+  the old filenames conserving their ytid's. The renaming pair ordering is alphanumerical,
+  so care must be taken here. The ytid is never lost (because it continues as-is after rename) but
+  the ordering may end up not being the one desired, so take a revision before rename-confirming.
+
+  The ideal case is when both sides (files in directory) and names (in the input file) have some
+  number-prefix sequencing, because ordering is much clearer in these cases.
+
 Usage:
-$renameConservingVideoid.py [-e=<ext>] [-n=<newnames_input_filename>] [-dp=<'/home/user1/sci_videos'>]
+  $renameConservingVideoid.py [-e=<ext>] [-n=<newnames_input_filename>] [-dp=<'/home/user1/sci_videos'>]
 
 Arguments:
   -e=<extension> => the file extension: examples: mp4 or webm
   -n=<newnames_input_filename> => a text file with has the new name for renaming
-  -dp=<dir_path> => the path to the directory where renames should occur
+  -dp=<dir_path> => the directory path where renames occur
 
 Example:
   $renameConservingVideoid.py -dp='/home/user1/sci_videos'
-In this example, two default values will take place:
-  default extension will be 'mp4'
-  default new names textfile is 'z-titles.txt'
+
+In above example, CLI the arguments will be:
+  1 extension => default extension will be 'mp4'
+  2 input filename => default new names textfile is 'z-titles.txt'
+  3 directory path => '/home/user1/sci_videos'
+
+Then, the script will fetch the names inside z-titles.txt and, in alphanumerical order,
+  add to each one the dash-ytid-dot-extension, composing the new filenames for renaming.
 """
 import os
 import sys
+import lblib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytfs  # ytfs.does_basename_end_with_dash_ytid()
+DEFAULT_DOTEXTENSION = '.mp4'
+DEFAULT_WORKDIR = '.'
+DEFAULT_NAMES_FILENAME = 'z-titles.txt'
+YT_VIDEOID_CHARSIZE = 11
 
 
 def check_n_clean_or_none_as_extension_startswithadot(dotextension):
@@ -29,52 +58,85 @@ def check_n_clean_or_none_as_extension_startswithadot(dotextension):
 
 
 class Renamer(object):
-  DEFAULT_DOTEXTENSION = '.mp4'
-  DEFAULT_NAMES_FILENAME = 'z-titles.txt'
-  VIDEOID_CHARSIZE = 11
-  
+
+  DEFAULT_DOTEXTENSION = DEFAULT_DOTEXTENSION
+  DEFAULT_WORKDIR = DEFAULT_WORKDIR
+  DEFAULT_NAMES_FILENAME = DEFAULT_NAMES_FILENAME
+
   def __init__(self, extension=None, names_filename=None, absdirpath=None):
-    self.dotextension = None
-    self.names_filename = None
-    self.absdirpath = None
+    self.renames_confirmed = False
     self.files = []
     self.filenames = []
     self.rename_pairs = []
-    self.set_dotextension_or_default(extension)
-    self.set_names_filename_or_default(names_filename)
-    self.set_absdirpath_or_default(absdirpath)
-    self.process()
+    self.new_filenames_w_ytid_n_dotext = []
+    self.dotextension = extension
+    self.names_filename = names_filename
+    self.absdirpath = absdirpath
+    self.treat_workdir_names_n_extension()
+    # self.process()
 
-  def set_names_filename_or_default(self, names_filename=None):
-    if names_filename is None:
-      self.names_filename = self.DEFAULT_NAMES_FILENAME
-      return
-    try:
-      names_filename = str(names_filename)
-      self.names_filename = names_filename
-    except ValueError:
-      self.names_filename = self.DEFAULT_NAMES_FILENAME
+  @property
+  def ytids_in_order(self):
+    ytids = []
+    for fn in self.filenames:
+      ytid = ytfs.extract_ytid_from_fn_w_0_or_1_ext_having_dash_ytid_sufix(fn)
+      ytids.append(ytid)
+    return ytids
 
-  def set_dotextension_or_default(self, dotextension=None):
-    if dotextension is None:
-      self.dotextension = self.DEFAULT_DOTEXTENSION
-      return
-    dotextension = check_n_clean_or_none_as_extension_startswithadot(dotextension)
-    if dotextension is None:
-      self.dotextension = self.DEFAULT_DOTEXTENSION
-    else:
-      self.dotextension = dotextension
-
-  def set_absdirpath_or_default(self, absdirpath=None):
-    self.absdirpath = None
-    if absdirpath is None or not os.path.isdir(absdirpath):
-      self.absdirpath = os.path.abspath('.')
-    else:
-      self.absdirpath = os.path.abspath(absdirpath)
-
-  def get_filename_conventioned_ending_charsize(self):
+  @property
+  def new_filenames(self):
     """
-    The youtube filename this script aims at follows the following convention:
+    Two list ordering must be coherent, they are:
+      1 the alphanumerical order of filenames (with also gets the ytid's)
+      2 the alphanumerical order of names in the input file
+    Because the names in the input file will replace the filenames in folder suffixing their ytid and extension
+    """
+    new_fns = []
+    for i, pre_fn in enumerate(self.new_filenames_w_ytid_n_dotext):
+      ytid = self.ytids_in_order[i]
+      new_filename = f"{pre_fn}-{ytid}{self.dotextension}"
+      new_fns.append(new_filename)
+    return new_fns
+
+  @property
+  def names_file(self):
+    return os.path.join(self.absdirpath, self.names_filename)
+
+  def treat_workdir_names_n_extension(self):
+    """
+    self.dotextension = extension
+    self.names_filename = names_filename
+    self.absdirpath = absdirpath
+    """
+    self.treat_dotextension()
+    self.treat_workdirpath()
+    self.treat_names_filename()
+
+  def treat_names_filename(self):
+    if self.names_filename is None:
+      self.names_filename = self.DEFAULT_NAMES_FILENAME
+    else:
+      try:
+        self.names_filename = str(self.names_filename)
+      except ValueError:
+        self.names_filename = self.DEFAULT_NAMES_FILENAME
+    if not os.path.isfile(self.names_file):
+      errmsg = f"names file does not exist: [{self.names_file}]"
+      raise OSError(errmsg)
+
+  def treat_dotextension(self):
+    self.dotextension = check_n_clean_or_none_as_extension_startswithadot(self.dotextension)
+    if self.dotextension is None:
+      self.dotextension = self.DEFAULT_DOTEXTENSION
+
+  def treat_workdirpath(self):
+    if self.absdirpath is None or not os.path.isdir(self.absdirpath):
+      self.absdirpath = os.path.abspath(self.DEFAULT_WORKDIR)
+
+  @property
+  def sufix_charsize(self):
+    """
+    The YouTube filename this script aims at follows the following convention:
       name + '-' + a-11-char-enc64-string + '.ext'
     In the above case, integer 11 should be attributed to constant VIDEOID_CHARSIZE
 
@@ -85,91 +147,101 @@ class Renamer(object):
       This function should return "this-is-a-videotitle"
     :return:
     """
-    trailing_charsize = self.VIDEOID_CHARSIZE + len(self.dotextension) + 1
-    return trailing_charsize
+    charsize = 1 + YT_VIDEOID_CHARSIZE + len(self.dotextension)
+    return charsize
     
-  def get_videoid_plus_ext_ending(self, old_filename):
-    # example => 1 [ie the - (dash)]  + 11 (the 11-char ytvideoid) + 4 (.mp4 ie dotextension)]
-    if len(old_filename) < self.get_filename_conventioned_ending_charsize():
+  def get_sufixstr_ytvideoid_plus_dotext_ending(self, old_filename):
+    if len(old_filename) < self.sufix_charsize + 1:
       return None
-    if not old_filename.endswith('%s' % self.dotextension):
+    if old_filename[-self.sufix_charsize] != '-':  # it's -16 with .mp4, ie, it's = 11 + 4 + 1
       return None
-    retro_pos = self.get_filename_conventioned_ending_charsize()
-    if old_filename[-retro_pos] != '-':  # it's -16 with .mp4, ie, it's = 11 + 4 + 1
-      return None
-    return old_filename[-retro_pos:]  # this will be appended after the "new name" under renaming
+    prefix_fn = old_filename[-self.sufix_charsize:]  # this will be appended after the "new name" under renaming
+    return prefix_fn
 
   def confirm_rename_pairs(self):
+    self.renames_confirmed = False
     print('='*40)
+    total_to_rename = len(self.rename_pairs)
     for i, rename_pair in enumerate(self.rename_pairs):
       seq = i + 1
       old_file = rename_pair[0]
       new_file = rename_pair[1]
       old_filename = os.path.split(old_file)[1]
       new_filename = os.path.split(new_file)[1]
-      print(seq, 'Rename:')
+      print(seq, '/', total_to_rename, 'Rename:')
       print('FROM: >>>', old_filename)
       print('TO:   >>>', new_filename)
     print('='*40)
     print('In directory:', self.absdirpath)
     ans = input('Confirm the %d renames above (Y*/n)? [ENTER] means Yes' % len(self.rename_pairs))
     if ans in ['Y', 'y', '']:
-      return True
-    return False
+      self.renames_confirmed = True
 
-  def do_rename(self):
-    if not self.confirm_rename_pairs():
-      print('No files were renamed.')
+  def do_rename_if_confirmed(self):
+    if not self.renames_confirmed:
+      print('No confirmation or no files to renamed.')
       return
+    total_to_rename = len(self.rename_pairs)
     for i, rename_pair in enumerate(self.rename_pairs):
-      old_file = rename_pair[0]
-      new_file = rename_pair[1]
-      old_filename = os.path.split(old_file)[1]
-      new_filename = os.path.split(new_file)[1]
-      print(i+1, 'Renaming', old_filename, 'TO', new_filename)
+      scrmsg = f"{i+1}/{total_to_rename} Renaming:, old_filename, 'TO', new_filename"
+      print(scrmsg)
+      old_filename = rename_pair[0]
+      new_filename = rename_pair[1]
+      old_file = os.path.join(self.absdirpath, old_filename)
+      new_file = os.path.join(self.absdirpath, new_filename)
+      scrmsg = f"\tfrom:  [{old_filename}]"
+      print(scrmsg)
+      scrmsg = f"\tto:    [{new_filename}]"
+      print(scrmsg)
+      scrmsg = f"\t\tin:    [{self.absdirpath}]"
+      print(scrmsg)
       os.rename(old_file, new_file)
-    print('%d files were renamed.' % len(self.rename_pairs))
+    scrmsg = ' => %d files were renamed.' % len(self.rename_pairs)
+    print(scrmsg)
 
-  def get_names_from_input_textfile_n_generate_renamepairs(self):
-    lines = open(self.names_filename).readlines()
+  def generate_renamepairs(self):
+    newfilenames = self.new_filenames
+    self.rename_pairs = []
+    for i, filename in enumerate(self.filenames):
+      newfilename = newfilenames[i]
+      rename_pair = (filename, newfilename)
+      self.rename_pairs.append(rename_pair)
+
+  def the_two_lists_must_have_same_size_or_raise(self):
+    if len(self.new_filenames_w_ytid_n_dotext) != len(self.filenames):
+      errmsg = f"Error: the number of both filenames (in dir) and names in the inputfile must be the same" \
+       f"(n_files={len(self.filenames)}<>in_input={len(self.new_filenames_w_ytid_n_dotext)})."
+      raise ValueError(errmsg)
+
+  def get_names_from_input_textfile(self):
+    lines = open(self.names_file).readlines()
     for i, new_title in enumerate(lines):
       new_title = new_title.lstrip(' \t').rstrip(' \t\r\n')
       if new_title == '':
         continue
-      try:  # IndexError may happen here
-        old_name = self.filenames[i]
-      except IndexError:
-        continue
-      ending = self.get_videoid_plus_ext_ending(old_name)
-      if ending is None:
-        continue
-      new_name = new_title + ending
-      if new_name == old_name:
-        continue
-      abspathfile = self.files[i]
-      new_abspathfile = os.path.join(self.absdirpath, new_name)
-      if abspathfile == new_abspathfile:
-        continue
-      rename_pair = (abspathfile, new_abspathfile)
-      self.rename_pairs.append(rename_pair)
+      self.new_filenames_w_ytid_n_dotext.append(new_title)
+    self.the_two_lists_must_have_same_size_or_raise()
 
-  def enlist_files_on_current_folder(self):
+  def grab_target_files_n_their_ytids(self):
     """
-    Picks up the files in absdirpath that ends with the class given extension
-    The result is stored in instance variable 'files'
-    :return:
+    Picks up the files in absdirpath that ends with the given dot_extension
+    The result is stored in instance variable (self) 'filenames': 'files' is a property (i.e. it's derivable)
     """
     entries = os.listdir(self.absdirpath)
-    entries = filter(lambda e: e.endswith(self.dotextension), entries)
-    fullentries = filter(lambda f: os.path.join(self.absdirpath, f), entries)
-    self.files = list(filter(lambda f: os.path.isfile(f), fullentries))
-    self.files.sort()
-    self.filenames = [os.path.split(abspathfile)[1] for abspathfile in self.files]
+    entries = list(filter(lambda e: e.endswith(self.dotextension), entries))
+    fullentries = list(map(lambda f: os.path.join(self.absdirpath, f), entries))
+    _files = list(filter(lambda f: os.path.isfile(f), fullentries))
+    filenames = [os.path.split(abspathfile)[1] for abspathfile in _files]
+    # filenames must end with dash-ytid plus dot-extension
+    filenames = filter(lambda fn: ytfs.does_fn_w_0_or_1_ext_have_a_dash_ytid_sufix(fn), filenames)
+    self.filenames = sorted(filenames)
 
   def process(self):
-    self.enlist_files_on_current_folder()
-    self.get_names_from_input_textfile_n_generate_renamepairs()
-    self.do_rename()
+    self.grab_target_files_n_their_ytids()
+    self.get_names_from_input_textfile()
+    self.generate_renamepairs()
+    self.confirm_rename_pairs()
+    self.do_rename_if_confirmed()
 
 
 def show_help():
@@ -204,9 +276,10 @@ def get_args():
 
 def process():
   extension, names_filename, dpath = get_args()
-  print('-e=%s' % extension, '-n=%s' % names_filename, '-dp=%s' % dpath)
-  print('-e=%s' % extension, '-n=%s' % names_filename, '-dp=%s' % dpath)
-  Renamer(extension, names_filename, dpath)
+  scrmsg = f'-e="{extension}" -n="{names_filename}" -dp="{dpath}"'
+  print(scrmsg)
+  renamer = Renamer(extension, names_filename, dpath)
+  renamer.process()
 
 
 if __name__ == '__main__':
