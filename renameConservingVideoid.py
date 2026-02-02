@@ -1,23 +1,39 @@
 #!/usr/bin/env python3
 """
 ~/bin/renameConservingVideoid.py
-  Renames files conserving the videoid (already in the dirfiles) and dot-extension suffix
-    using as new names those in an input file and confirming alphanumerical ordering.
+  Renames files in a folder conserving their youtube-video-id's (already in them)
+    and their dot-extension suffix,
+    prepending, for the new filenames, the "phrases" in an input text file.
+  The renaming follows the alphanumerical ordering.
+
+Example of this functionality:
+  Suppose a folder has one file: "file-abc_123-ABC.mp4"
+  Suppose also that in the input text file there is found: "This is the new name"
+  The renaming that this script does should be:
+    from: "file-abc_123-ABC.mp4"
+    to:   "This is the new name-abc_123-ABC.mp4
+  i.e., the original video-id (abc_123-ABC) and its extension (mp4) are conserved.
 
 Limitation:
   This script only works with one extension at time.
 
-Cause:
-  The renamings with this script can be undone. Use it with care.
+Caution:
+  The renamings with this script cannot be undone. Use it with care.
 
 Important:
   Care must also be taken in another sense. The new filenames will 'prepend', so to say,
   the old filenames conserving their ytid's. The renaming pair ordering is alphanumerical,
   so care must be taken here. The ytid is never lost (because it continues as-is after rename) but
-  the ordering may end up not being the one desired, so take a revision before rename-confirming.
+  the ordering may end up not being the one desired
+    (especially in cases where "10 " comes before "2 "), so take a revision before rename-confirming.
 
-  The ideal case is when both sides (files in directory) and names (in the input file) have some
-  number-prefix sequencing, because ordering is much clearer in these cases.
+  The ideal case happens when both sides (files in directory) and names (in the input file) have some
+  number-prefix sequencing, respecting left-zeroes if needed ("10 " comes after "02 "),
+  because ordering is much clearer in these cases.
+
+Dependencies:
+  This script requires Python 3.4 or later.
+  And a local library module for youtube-id-functions (@see imports).
 
 Usage:
   $renameConservingVideoid.py [-e=<ext>] [-n=<newnames_input_filename>] [-dp=<'/home/user1/sci_videos'>]
@@ -27,7 +43,7 @@ Arguments:
   -n=<newnames_input_filename> => a text file with has the new name for renaming
   -dp=<dir_path> => the directory path where renames occur
 
-Example:
+Example 1:
   $renameConservingVideoid.py -dp='/home/user1/sci_videos'
 
 In above example, CLI the arguments will be:
@@ -37,6 +53,15 @@ In above example, CLI the arguments will be:
 
 Then, the script will fetch the names inside z-titles.txt and, in alphanumerical order,
   add to each one the dash-ytid-dot-extension, composing the new filenames for renaming.
+
+Example 2:
+  $renameConservingVideoid.py -e=mp3 =n=course-titles.txt -dp="/media/disk/Science"
+
+In this example, CLI the arguments will be:
+  1 extension => default extension will be 'mp3'
+  2 input filename => 'course-titles.txt'
+  3 directory path => '/media/disk/Science'
+
 """
 import os
 import sys
@@ -135,7 +160,7 @@ class Renamer(object):
 
   @property
   def sufix_charsize(self):
-    """
+    """b
     The YouTube filename this script aims at follows the following convention:
       name + '-' + a-11-char-enc64-string + '.ext'
     In the above case, integer 11 should be attributed to constant VIDEOID_CHARSIZE

@@ -29,6 +29,9 @@ As above but s1 string should end foldernames.
 
   3) $renameReplaceUpDirs12.py -s1="foo" -s2="bar"  -as_endswith -dirwalk
 As above but adding recursive cd'ing processing (i.e. the current directory and all its subdirectories).
+
+  4) $renameReplaceUpDirs12.py -s1=" au+vi" -s2="au"  -as_endswith -dirwalk -basedir="/media/disk/Science"
+Similar to the one above, adding also parameter -basedir for the current working directory.
 """
 import os
 import sys
@@ -210,6 +213,8 @@ def process():
   args_dict = get_args()
   ad = args_dict
   s1, s2, as_endswith, dirwalk, basedir = ad['s1'], ad['s2'], ad['as_endswith'], ad['dirwalk'], ad['basedir']
+  scrmsg = f"s1={s1} | s2={s2} | as_endswith={as_endswith} | dirwalk={dirwalk} | basedir={basedir}"
+  print(scrmsg)
   renamer = Renamer(s1, s2, as_endswith, dirwalk, basedir)
   renamer.process()
 
