@@ -106,7 +106,7 @@ def dispatch():
   dispatcher.dispatch_to_destination_script()
 
 
-if __name_  _ == "__main__":
+if __name__ == "__main__":
   """
   adhoctest1()
   """
