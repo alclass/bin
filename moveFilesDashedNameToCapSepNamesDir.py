@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
 ~/bin/moveFilesDashedNameToCapSepNamesDir
+  This script moves files into directories that follow a certain specified convention (initials of first two words).
 
-This script moves files into directories that bind to a certain specified convention.
-
-This convention, not "openly general" at this time, is the following:
+This mentioned convention is the following:
 
 1) suppose a filename that has a name-dash-surname (or any word dash another),
    and this name-dash-surname exactly after a word and a space (gap),
@@ -18,8 +17,9 @@ This convention, not "openly general" at this time, is the following:
   ie,
   subdirectory "A" is because first name starts with A ([A]lbert)
   subdirectory "AL", inside "A", is because first name starts with AL ([Al]bert)
-  resulting in path "<base-dir>/A/AL"
-  where <base-dir> is the absolute directory acting as 'base dir path'
+  resulting in path "<base-dir>/A/AL";
+    where
+      <base-dir> is the absolute directory acting as 'base dir path'
 
 How <base-dir> is given
 =======================
@@ -49,12 +49,15 @@ Suppose that in the executing directory one has file
 The script will move this file to:
     /this/videodir/"50' albert-einstein theory of relativity. ext"
 
+from pathlib import Path
 """
-import glob
 import os
 import sys
 import shutil
-from pathlib import Path
+from pathlib import Path, PosixPath
+
+from renameWithNewNameListingFileAndExt import DEFAULT_EXT
+
 default_dot_ext = '.mp4'
 
 
@@ -107,9 +110,11 @@ def create_dirpaths(paths_not_existing):
     print('Creating dirpath', ppath)
     os.makedirs(ppath)
 
+
 class FilenameItem:
 
   conventioned_suffix_for_topdirname = 'yyyy cc'
+
   def __init__(self, orig_filename):
     self.orig_filename = orig_filename
     self._names = None
@@ -199,13 +204,13 @@ class FilenameItem:
       return list(middledirs_convention_str.split('/'))
     return None
 
-  def form_conventioned_topdirname(self, basedir):
+  def form_conventioned_topdirname(self, basedir: PosixPath | str) -> str:
     """
     Let's see the workings in this function by an example:
     Suppose a topfolder exists with name "Albert Einstein 1920 book"
     How can it be found?
       1) middlepath is known, ie, it's "<basedir>/A/AL"
-      2) the prefixing topfolder name also is known, foldername begins with "Albert Einstein"
+      2) the prefixing topfolder name is also known, foldername begins with "Albert Einstein"
       3) so the function can look up all entries in middle
          and get the first one that starts with "Albert Einstein"
          3.1) as a convention, it should only have one such prefixed-named directory
@@ -230,19 +235,25 @@ class FilenameItem:
         return topdirname
     return default_topdirname
 
-  def form_basedir_plus_lettermiddlepath(self, basedir):
+  def form_basedir_plus_lettermiddlepath(self, basedir: PosixPath | str) -> PosixPath | str | None:
     """
     To be called from an AlphabetMover object, or any one that 'knows' basedir
     The result path may or not exist, the caller should find out (maybe ask its creation...)
     """
-    return os.path.join(basedir, self.letter_n_doubleletter_middledirs)
+    try:
+      basedir = Path(basedir)
+      midpath = basedir / self.letter_n_doubleletter_middledirs
+      return midpath
+    except ValueError:
+      pass
+    return None
 
-  def form_basedir_lettermiddlepath_n_convention(self, basedir):
+  def form_basedir_lettermiddlepath_n_convention(self, basedir: PosixPath | str):
     middlepath = self.form_basedir_plus_lettermiddlepath(basedir)
     conventioned_topdirname = self.form_conventioned_topdirname(basedir)
     return os.path.join(middlepath, conventioned_topdirname)
 
-  def discover_an_folder_with_a_changedsufix(self, basedir):
+  def discover_a_folder_with_a_changedsufix(self, basedir: PosixPath | str) -> PosixPath | None:
     middlepath = self.form_basedir_plus_lettermiddlepath(basedir)
     entries = os.listdir(middlepath)
     direntries = map(lambda e: os.path.join(middlepath, e), entries)
@@ -254,8 +265,8 @@ class FilenameItem:
         return dirpath
     return None
 
-  def get_basedir_lettermiddlepath_name_or_convention(self, basedir):
-    dirpath = self.discover_an_folder_with_a_changedsufix(basedir)
+  def get_basedir_lettermiddlepath_name_or_convention(self, basedir: PosixPath | str) -> PosixPath | str | None:
+    dirpath = self.discover_a_folder_with_a_changedsufix(basedir)
     if dirpath is None:
       return self.form_basedir_lettermiddlepath_n_convention(basedir)
     return dirpath
@@ -265,8 +276,8 @@ class FilenameItem:
       'dashednames_str': {self.dashednames_str},
       'spaced_names_str': {self.spaced_names_str},
       'capitalized_letters_from_eachname_aslist': {str(self.capitalized_letters_from_eachname_aslist)},
-      'capitalized_firsttwoletters_from_firstname_aslist': \
-        {str(self.capitalized_firsttwoletters_from_firstname_aslist)},
+      'capitalized_firsttwoletters_from_firstname_aslist':
+      {str(self.capitalized_firsttwoletters_from_firstname_aslist)},
       'names': {str(self.names)},
     }
     return _as_str_dict
@@ -311,7 +322,8 @@ class AlphabetFileMover:
     for movepair in self.move_pair_list:
       targetpath = movepair[1]
       if not os.path.isdir(targetpath):
-        self.paths_not_existing.append(targetpath)
+        if targetpath not in self.paths_not_existing:
+          self.paths_not_existing.append(targetpath)
 
   def create_target_folders_if_needed(self):
     """
@@ -328,7 +340,6 @@ class AlphabetFileMover:
     ans = input(scrmsg)
     if ans in ['Y', 'y', '']:
       create_dirpaths(self.paths_not_existing)
-
 
   def move_source_files_to_target_folders(self):
     if len(self.move_pair_list) == 0:
@@ -351,24 +362,30 @@ class AlphabetFileMover:
     print('='*40)
     print('Initiating moving')
     print('='*40)
+    total_to_mv = len(self.move_pair_list)
     for i, movepair in enumerate(self.move_pair_list):
       seq = i + 1
       movefilename = movepair[0]
-      sourcefilepath = os.path.join(self.sourcedir, movefilename)
-      if not os.path.isfile(sourcefilepath):
+      self.sourcedir = Path(self.sourcedir)
+      sourcefilepath = self.sourcedir / movefilename
+      if not sourcefilepath.is_file():
         print('\tsource does not exist :', sourcefilepath)
         print('\t\tcontinuing...')
         continue
       targetdirpath = movepair[1]
-      targetfilepath = os.path.join(targetdirpath, movefilename)
-      if os.path.isfile(targetfilepath):
+      targetdirpath = Path(targetdirpath)
+      targetfilepath = targetdirpath / movefilename
+      if targetfilepath.is_file():
         print('\ttarget file already exist:', sourcefilepath)
         print('\t\tcan not move it, continuing...')
         continue
       shutil.move(sourcefilepath, targetdirpath)
-      print(seq, 'Moved')
-      print('\tFROM :', sourcefilepath)
-      print('\tTO   :', targetdirpath)
+      scrmsg = f"{seq} / {total_to_mv} moved:"
+      print(scrmsg)
+      scrmsg = f"\t FROM : [{sourcefilepath}]"
+      print(scrmsg)
+      scrmsg = f"\t TO   : [{targetdirpath}]"
+      print(scrmsg)
 
   def treat_dot_ext(self):
     if self.dot_ext is None:
@@ -379,16 +396,17 @@ class AlphabetFileMover:
   def treat_sourcedir(self):
     if self.sourcedir is None:
       # default to current (running) directory
-      self.sourcedir = os.path.abspath(os.curdir)
-    if not os.path.isdir(self.sourcedir):
+      self.sourcedir = os.getcwd()  # or os.path.abspath(os.curdir)
+    self.sourcedir = Path(self.sourcedir)
+    if not self.sourcedir.is_dir():
       errmsg = 'Source directory [%s] does not exist.' % self.sourcedir
       raise OSError(errmsg)
 
   def treat_basedir(self):
     if self.basedir is None:
       # default to parent's parent directory
-      self.basedir = os.path.abspath('../..')
-    if not os.path.isdir(self.basedir):
+      self.basedir = Path(os.path.abspath('../..'))
+    if not self.basedir.is_dir():
       errmsg = 'base directory [%s] does not exist.' % self.basedir
       raise OSError(errmsg)
 
@@ -401,7 +419,6 @@ class AlphabetFileMover:
       move_to_dir = fileitem.form_basedir_lettermiddlepath_n_convention(self.basedir)
       pair = (eachfile, move_to_dir)
       self.move_pair_list.append(pair)
-
 
   def gather_source_files_to_move_to_dirs(self):
     """
@@ -455,35 +472,6 @@ class AlphabetFileMover:
     return outstr
 
 
-def find_second_level_dirpath_from_name(self, cap_sep_name):
-  """
-  maybe incomplete as yet
-  """
-  if cap_sep_name is None:
-    return None
-  firstletter = cap_sep_name[0]
-  firstdir = os.path.join(self.basedir, firstletter)
-  if not os.path.isdir(firstdir):
-    return None
-  print('firstdir =>', firstdir)
-  if not os.path.isdir(second_level_dirpath):
-    return None
-  print('seconddir =>', second_level_dirpath)
-  return second_level_dirpath
-
-
-def move_pairs(move_pair_list):
-  for i, move_pair in enumerate(move_pair_list):
-    filename, cap_sep_name = move_pair
-    targetentry = find_n_get_folder(cap_sep_name)
-    seq = i + 1
-    print(seq)
-    print('FROM: ', filename)
-    print('TO:   ', targetentry)
-    if targetentry is not None:
-      print('Moving...')
-      shutil.move(filename, targetentry)
-  
 def get_args():
   basedir = None
   dot_ext = None
@@ -510,12 +498,17 @@ def adhoc_test1():
   dirpath = it.form_basedir_plus_lettermiddlepath('/dados/Science/Phy')
   print(dirpath)
 
+
 def process():
   """
   """
   basedir, dot_ext, sourcedir = get_args()
+  sm_basedir = basedir or 'parent/parent directory'
+  sm_dotext = dot_ext or DEFAULT_EXT
+  sm_sourcedir = sourcedir or 'the current directory'
   print('Params')
-  print('basedir | dot_ext | sourcedir', basedir, ' | ', dot_ext, ' | ', sourcedir)
+  scrmsg = f"basedir={sm_basedir} | dot_ext={sm_dotext} | sourcedir={sm_sourcedir}"
+  print(scrmsg)
   alphabetmover = AlphabetFileMover(basedir, dot_ext, sourcedir)
   alphabetmover.process_move()
 
