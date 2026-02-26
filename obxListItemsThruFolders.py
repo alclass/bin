@@ -36,6 +36,8 @@ class TextThruFoldersGrabber:
       scrmsg = f"{sku}\t{title}"
       # print(self.n_items, sku, title)
       print(scrmsg)
+    scrmsg = f"Total {len(items)} / {self.n_items}"
+    print(scrmsg)
 
   def read_files(self):
     for filepath in self.files_to_read:
@@ -60,7 +62,7 @@ class TextThruFoldersGrabber:
 
   def walkup_fr_basefolder(self):
     for i, (self.curdir_abspath, _, filenames) in enumerate(os.walk(self.base_folder)):
-      seq = i + 1
+      # seq = i + 1
       # print(seq, 'traversing:', self.curdir_abspath)
       self.process_folder(filenames)
 
