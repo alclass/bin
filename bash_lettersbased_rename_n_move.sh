@@ -3,5 +3,6 @@ renameAudioDurationIncluder.py -y -e=mp4; renameYtDlpBracketConventionToFormer.p
 renameCleanBeginning.py -e=mp4 -p=3 -y
 renameCleanRegExp.py -e=mp4 -r="\[\w+\d*\]+" -y
 renameCleanSpecifiedStr.py -e=mp4 -s="RNER.COM - " -y
-renameCleanSpecifiedStr.py -e=mp4 -s=" (360)" -y
+# renameCleanSpecifiedStr.py -e=mp4 -s=" (360)" -y
+renameReplace12.py -e=mp4 -s1="(240)" -s2="240p" -y
 # moveFilesDashedNameToCapSepNamesDir.py
