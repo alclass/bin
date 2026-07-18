@@ -11,11 +11,12 @@ pyidle
 source-ifort-path
 local_settings.py
 bin_local_settings.py
+.env
 *~
 *.bak
 *.bin
-*.ex
 *.desktop
+*.ex
 *.log
 *.pyc
 *.sqlite
